@@ -328,13 +328,17 @@ function sage_roi_woo_show_excerpt_shop_page() {
     global $product;
     $attributes = $product->get_attributes();
     foreach($attributes as $key => $attrib) {
-        echo "<p><small>". $attributes[$key]['name'] .": " . implode($attributes[$key]['options'], ", ") . "</small></p>";
+        if(is_array($attributes[$key]['options'])) {
+            echo "<p><small>". $attributes[$key]['name'] .": " . join(", ", array_unique($attributes[$key]['options'])) . "</small></p>";
+        } else {
+            echo "<p><small>". $attributes[$key]['name'] .": " . $attributes[$key]['options'] . "</small></p>";
+        }
     }
 
     $productId = $product->get_id();
     $unitsPerPackage = get_post_meta( $productId, sage_roi_option_key('product_unit_per_package'), true );
     if(!empty($unitsPerPackage)) {
-        echo '<p class="'.sage_roi_option_key('product_unit_per_package').'"><small>Units Per Package: '.$unitsPerPackage.'</small></p>';
+        echo '<p class="'.sage_roi_option_key('product_unit_per_package').'"><small>Units per package: '.$unitsPerPackage.'</small></p>';
     }
 
 }
