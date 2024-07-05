@@ -210,3 +210,57 @@ function sage_roi_class_wc_report_customer_list() {
         }
     }
 }
+
+
+
+ # Order List Custom Columns
+
+ // ADDING 2 NEW COLUMNS WITH THEIR TITLES (before "Total" and "Actions" columns)
+add_filter( 'manage_edit-shop_order_columns', 'sage_roi_add_admin_order_list_custom_column', 20 );
+function sage_roi_add_admin_order_list_custom_column($columns)
+{
+    $reordered_columns = array();
+    // Inserting columns to a specific location
+    foreach( $columns as $key => $column){
+        $reordered_columns[$key] = $column;
+        if( $key ==  'order_number' ){
+            // Inserting after "Status" column
+            $reordered_columns['sage_roi_SalesOrderNo'] = __( 'Sales Order No.', 'woocommerce');
+            $reordered_columns['sage_roi_customer_number'] = __( 'Customer #', 'woocommerce');
+            $reordered_columns['sage_roi_store_code'] = __( 'Store Code', 'woocommerce');
+        }
+    }
+    return $reordered_columns;
+}
+
+// Adding custom fields meta data for each new column (example)
+add_action( 'manage_shop_order_posts_custom_column' , 'sage_roi_display_admin_order_list_custom_column_content', 20, 2 );
+function sage_roi_display_admin_order_list_custom_column_content( $column, $post_id )
+{
+    try {
+
+        global $the_order;
+        $orderJson = get_post_meta( $the_order->get_id(), sage_roi_option_key('order_json' ), true );
+        $orderJson = json_decode($orderJson);
+
+        switch ( $column )
+        {
+            case 'sage_roi_SalesOrderNo' :
+                echo $orderJson->SalesOrderNo;
+            break;
+
+            case 'sage_roi_customer_number':
+                if($orderJson->Customer->CustomerNo) {
+                    echo $orderJson->Customer->ARDivisionNo."-".$orderJson->Customer->CustomerNo;
+                }       
+            break;
+
+            case 'sage_roi_store_code':
+                echo $orderJson->Customer->CustomerNo;
+            break;
+        }
+
+    } catch(Exception $e) {
+        // nothing to do if there is an error.
+    }
+}

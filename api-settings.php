@@ -139,6 +139,15 @@
         Stop Customers Sync
     </label>
 
+    <label class="label-checkbox" for="<?php echo sage_roi_option_key('stop_sync_orders'); ?>">
+        <input type="checkbox" 
+        id="<?php echo sage_roi_option_key('stop_sync_orders'); ?>" 
+        name="<?php echo sage_roi_option_key('stop_sync_orders'); ?>"
+        <?php echo sage_roi_get_option('stop_sync_orders') ? "checked" : ""; ?>
+        >
+        Stop Orders Sync
+    </label>
+
     <h3>Resets</h3>
     <p>It will sync starts to first page</p>
 
@@ -155,6 +164,11 @@
     <label class="label-checkbox" for="<?php echo sage_roi_option_key('reset_customers_sync'); ?>">
         <input type="checkbox" id="<?php echo sage_roi_option_key('reset_customers_sync'); ?>" name="<?php echo sage_roi_option_key('reset_customers_sync'); ?>">
         Reset Customers Sync (current page to sync: <?php echo sage_roi_get_option('customers_page_number'); ?>)
+    </label>
+
+    <label class="label-checkbox" for="<?php echo sage_roi_option_key('reset_orders_sync'); ?>">
+        <input type="checkbox" id="<?php echo sage_roi_option_key('reset_orders_sync'); ?>" name="<?php echo sage_roi_option_key('reset_orders_sync'); ?>">
+        Reset Orders Sync (current page to sync: <?php echo sage_roi_get_option('orders_page_number'); ?>)
     </label>
 
     <input type="submit" name="submit" id="submit" class="update-button button button-primary" style="margin-bottom: 5px;" value="Save and execute resets"  />  

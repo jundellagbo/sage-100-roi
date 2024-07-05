@@ -115,6 +115,7 @@ function sage_roi_sync_settings() {
     sage_roi_set_option( 'stop_sync_items', isset($_POST[sage_roi_option_key('stop_sync_items')]) ? 1 : null );
     sage_roi_set_option( 'stop_sync_items_images', isset($_POST[sage_roi_option_key('stop_sync_items_images')]) ? 1 : null );
     sage_roi_set_option( 'stop_sync_customers', isset($_POST[sage_roi_option_key('stop_sync_customers')]) ? 1 : null );
+    sage_roi_set_option( 'stop_sync_orders', isset($_POST[sage_roi_option_key('stop_sync_orders')]) ? 1 : null );
 
     // resets
     if(isset($_POST[sage_roi_option_key('reset_item_sync')])) {
@@ -125,6 +126,9 @@ function sage_roi_sync_settings() {
     }
     if(isset($_POST[sage_roi_option_key('reset_customers_sync')])) {
         sage_roi_set_option( 'customers_page_number', 1 );
+    }
+    if(isset($_POST[sage_roi_option_key('reset_orders_sync')])) {
+        sage_roi_set_option( 'orders_page_number', 1 );
     }
     wp_redirect($_SERVER['HTTP_REFERER'] . '&settings=1');
 }
@@ -176,4 +180,13 @@ function sage_roi_submit_api_key() {
 
     // Redirect to same page with status=1 to show our options updated banner
     wp_redirect($_SERVER['HTTP_REFERER'] . '&status=1');
+}
+
+function sage_roi_api_date( $date ) {
+    if(!$date) {
+        return null;
+    }
+
+    $date = new DateTime("20230224");
+    return $date->format("Y-m-d H:i:s");
 }
