@@ -160,6 +160,15 @@
     <input type="submit" name="submit" id="submit" class="update-button button button-primary" style="margin-bottom: 5px;" value="Save and execute resets"  />  
 </form> 
 
+
+<div class="divider"></div>
+
+<div>
+    <label>Access Token</label>
+    <input type="text" id="accessTokenValue" readonly value="<?php echo $fds->decrypt( sage_roi_get_option('access_token') ); ?>">
+    <button onclick="copyAccessToken()" class="button button-primary">Copy access token</button>
+</div>
+
 <script type="text/javascript">
     // remove the success status after save.
     window.history.replaceState(null, '', window.location.href.replace(/(&status=0|&status=1|&showSecret=1|&settings=1)/g, ''));
@@ -168,12 +177,6 @@
         let copyGfGText = document.getElementById("accessTokenValue");
             copyGfGText.select();
             document.execCommand("copy");
+            alert("Access token has been copied.");
     }
 </script>
-
-<?php echo $fds->decrypt( sage_roi_get_option('access_token') ); 
-// https://roiconsultingapidev.azurewebsites.net/api/v2/sales_order_history_headers
-// https://usersinsights.com/woocommerce-create-customer/
-// https://usersinsights.com/woocommerce-create-order-code/
-// https://usersinsights.com/woocommerce-create-customer/
-?>
