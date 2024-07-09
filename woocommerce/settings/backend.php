@@ -83,7 +83,7 @@ function sage_roi_save_variation_setting_fields($variation, $i) {
     if ( isset($_POST[$field_key][$i]) ) {
         sage_roi_meta_upsert( 
             'post', 
-            $variation->id, 
+            $variation->get_id(), 
             'number_of_units_package', 
             sanitize_text_field($_POST[$field_key][$i])
         );
