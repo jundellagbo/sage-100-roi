@@ -130,4 +130,17 @@ function sage_roi_set_customer_order( $orderObject ) {
     $order->add_meta_data( sage_roi_option_key( 'order_json' ), json_encode($orderObject, true) );
 
     $order->save();
+
+    // update order item metas
+    foreach( $order->get_items() as $item_id => $item ) {
+        $productIdForMeta = $item->get_product_id();
+        $productForMeta = wc_get_product($productIdForMeta);
+        foreach( $orderObject->SalesOrderHistoryDetails as $oitems ) {
+            $pSku = $productForMeta->get_sku();
+            if($oitems->Item->ItemCode === $pSku) {
+                wc_update_order_item_meta($item_id, sage_roi_option_key('order_item_json'), json_encode($oitems));
+            }
+        }
+    }
+
 }

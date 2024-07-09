@@ -271,6 +271,7 @@ function sage_roi_display_admin_order_list_custom_column_content( $column, $post
 function sage_roi_action_woocommerce_admin_order_item_headers() {
     
     // Display the column name
+    // echo '<th class="line_packing_weight sortable" data-sort="string-ins">' .  __( 'Item #', 'woocommerce' ) . '</th>';
     echo '<th class="line_packing_weight sortable" data-sort="string-ins">' .  __( 'Item Code', 'woocommerce' ) . '</th>';
     echo '<th class="line_packing_weight sortable" data-sort="string-ins">' .  __( 'Product Line', 'woocommerce' ) . '</th>';
     echo '<th class="line_packing_weight sortable" data-sort="string-ins">' .  __( 'Units Per Package', 'woocommerce' ) . '</th>';
@@ -280,14 +281,28 @@ add_action( 'woocommerce_admin_order_item_headers', 'sage_roi_action_woocommerce
 
 //Add content
 function sage_roi_action_woocommerce_admin_order_item_values( $product, $item, $item_id=null ) {
+    global $post;
+    $orderId = $post->ID;
+    $itemId = $item->get_id();
     try {
-        $itemJson = get_post_meta( $item->get_id(), sage_roi_option_key('product_json' ), true );
-        $itemJson = json_decode($itemJson);
+        $itemMetaJson = wc_get_order_item_meta($itemId, sage_roi_option_key('order_item_json'));
+        $itemMetaJson = json_decode($itemMetaJson);
+        $itemJson = $itemMetaJson->Item;
+
+        $quantity = $itemJson->QuantityOrderedOriginal;
+        if($itemJson->QuantityOrderedOriginal !== $itemJson->QuantityOrderedRevised) {
+            $quantity = $itemJson->QuantityOrderedRevised;
+        }
+
+        $unitMeasure = (int) $itemMetaJson->UnitOfMeasureConvFactor;
+        $unitMeasure = $unitMeasure<=1?"":$unitMeasure;
+        // echo '<td>' . $itemMetaJson->AliasItemNo . '</td>';
         echo '<td>' . $itemJson->ItemCode . '</td>';
         echo '<td>' . $itemJson->ProductLine . '</td>';
         echo '<td>' . $itemJson->StandardUnitOfMeasure . '</td>';
-        echo '<td></td>';
+        echo '<td>' . $unitMeasure . " " . $itemMetaJson->UnitOfMeasure . '</td>';
     } catch(Exception $e) {
+        // echo '<td></td>';
         echo '<td></td>';
         echo '<td></td>';
         echo '<td></td>';
@@ -295,3 +310,7 @@ function sage_roi_action_woocommerce_admin_order_item_values( $product, $item, $
     }
 }
 add_action( 'woocommerce_admin_order_item_values', 'sage_roi_action_woocommerce_admin_order_item_values', 10, 3 );
+
+function sage_roi_sales_order_item() {
+
+}
