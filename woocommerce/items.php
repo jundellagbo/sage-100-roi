@@ -22,7 +22,7 @@ function sage_roi_items_sync_api( WP_REST_Request $request ) {
     $page = sage_roi_get_option( 'products_page_number' );
     $page = empty($page) ? 1 : $page;
     $fds = new FSD_Data_Encryption();
-    $requestURL = "https://roiconsultingapidev.azurewebsites.net/api/v2/items/search?PageNumber=$page&PageSize=5";
+    $requestURL = "https://roiconsultingapidev.azurewebsites.net/api/v2/items/search?PageNumber=$page&PageSize=20";
     $response = wp_remote_post($requestURL, array(
         'headers' => array(
             'Content-Type' => 'application/json',
