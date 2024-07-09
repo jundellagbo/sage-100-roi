@@ -22,7 +22,7 @@ function sage_roi_items_sync_api( WP_REST_Request $request ) {
     $page = sage_roi_get_option( 'products_page_number' );
     $page = empty($page) ? 1 : $page;
     $fds = new FSD_Data_Encryption();
-    $requestURL = "https://roiconsultingapidev.azurewebsites.net/api/v2/items/search?PageNumber=$page&PageSize=20";
+    $requestURL = "https://roiconsultingapidev.azurewebsites.net/api/v2/items/search?PageNumber=$page&PageSize=5";
     $response = wp_remote_post($requestURL, array(
         'headers' => array(
             'Content-Type' => 'application/json',
@@ -74,56 +74,42 @@ function sage_roi_simple_product( $productObject ) {
     // product category
     if(isset( $productObject->IM_ProductLine->ProductLineDesc )) {
         $categorySlug = strtolower($productObject->IM_ProductLine->ProductLineDesc);
-        $category = get_term_by( 'slug', $categorySlug, 'product_cat' );
-        $categoryId = $category->term_id;
-        if(!isset($categoryId)) {
-            $newcat = wp_insert_term(
-                ucwords($categorySlug),
-                'product_cat',
-                array(
-                    'slug' => $categorySlug
-                )
-            );
-            $categoryId = $newcat['term_id'];
-            sage_roi_meta_upsert( 'term', $categoryId, 'category_json', json_encode($productObject->IM_ProductLine, true));
+        if($category = get_term_by( 'slug', $categorySlug, 'product_cat' )) {
+            $categoryId = $category->term_id;
+            if(!isset($categoryId)) {
+                $newcat = wp_insert_term(
+                    ucwords($categorySlug),
+                    'product_cat',
+                    array(
+                        'slug' => $categorySlug
+                    )
+                );
+                $categoryId = $newcat['term_id'];
+                sage_roi_meta_upsert( 'term', $categoryId, 'category_json', json_encode($productObject->IM_ProductLine, true));
+            }
+            $product->set_category_ids( array( $categoryId ) ); 
         }
-        $product->set_category_ids( array( $categoryId ) ); 
-    }
-
-    // product category
-    if(isset( $productObject->IM_ProductLine->ProductLineDesc )) {
-        $categorySlug = strtolower($productObject->IM_ProductLine->ProductLineDesc);
-        $category = get_term_by( 'slug', $categorySlug, 'product_cat' );
-        $categoryId = $category->term_id;
-        if(!isset($categoryId)) {
-            $newcat = wp_insert_term(
-                ucwords($categorySlug),
-                'product_cat',
-                array(
-                    'slug' => $categorySlug
-                )
-            );
-            $categoryId = $newcat['term_id'];
-            sage_roi_meta_upsert( 'term', $categoryId, 'category_json', json_encode($productObject->IM_ProductLine, true));
-        }
-        $product->set_category_ids( array( $categoryId ) ); 
     }
     // end of product category
 
 
     $product->save();
+
+    $productId = $product->get_id();
+
     // save post meta of product object from sage 100
-    sage_roi_meta_upsert( 'post', $product->id, 'product_json', json_encode($productObject, true));
+    sage_roi_meta_upsert( 'post', $productId, 'product_json', json_encode($productObject, true));
 
     sage_roi_meta_upsert( 
         'post', 
-        $product->id, 
+        $productId, 
         'product_unit_per_package', 
         $productObject->StandardUnitOfMeasure
     );
 }
 
 function sage_roi_variant_product( $productObject ) {
+
     global $wpdb;
     $product = new WC_Product_Variable();
     $product_id = wc_get_product_id_by_sku( $productObject->ItemCode );
@@ -160,32 +146,35 @@ function sage_roi_variant_product( $productObject ) {
     // product category
     if(isset( $productObject->IM_ProductLine->ProductLineDesc )) {
         $categorySlug = strtolower($productObject->IM_ProductLine->ProductLineDesc);
-        $category = get_term_by( 'slug', $categorySlug, 'product_cat' );
-        $categoryId = $category->term_id;
-        if(!isset($categoryId)) {
-            $newcat = wp_insert_term(
-                ucwords($categorySlug),
-                'product_cat',
-                array(
-                    'slug' => $categorySlug
-                )
-            );
-            $categoryId = $newcat['term_id'];
-            sage_roi_meta_upsert( 'term', $categoryId, 'category_json', json_encode($productObject->IM_ProductLine, true));
+        if($category = get_term_by( 'slug', $categorySlug, 'product_cat' )) {
+            $categoryId = $category->term_id;
+            if(!isset($categoryId)) {
+                $newcat = wp_insert_term(
+                    ucwords($categorySlug),
+                    'product_cat',
+                    array(
+                        'slug' => $categorySlug
+                    )
+                );
+                $categoryId = $newcat['term_id'];
+                sage_roi_meta_upsert( 'term', $categoryId, 'category_json', json_encode($productObject->IM_ProductLine, true));
+            }
+            $product->set_category_ids( array( $categoryId ) ); 
         }
-        $product->set_category_ids( array( $categoryId ) ); 
     }
     // end of product category
 
     $product->save();
 
+    $productId = $product->get_id();
+
     // save post meta of product object from sage 100
-    sage_roi_meta_upsert( 'post', $product->id, 'product_json', json_encode($productObject, true));
+    sage_roi_meta_upsert( 'post', $productId, 'product_json', json_encode($productObject, true));
 
     // units per package
     sage_roi_meta_upsert( 
         'post', 
-        $product->id, 
+        $productId, 
         'product_unit_per_package', 
         $productObject->StandardUnitOfMeasure
     );
@@ -194,7 +183,7 @@ function sage_roi_variant_product( $productObject ) {
     $variations = array(
         array(
             'attributes' => array( sanitize_title($sageAttributeKey) => $productObject->PurchaseUnitOfMeasure ),
-            'identifier' => 'woo-variation-identifier-' . $productObject->PurchaseUnitOfMeasure . '-' . $product->id,
+            'identifier' => 'woo-variation-identifier-' . $productObject->PurchaseUnitOfMeasure . '-' . $productId,
             'number_of_unit' => isset($productObject->PurchaseUMConvFctr) ? $productObject->PurchaseUMConvFctr : 1,
             'stock' => 'instock',
             'stock_qty' => count($productObject->ItemWarehouses) ? $productObject->ItemWarehouses[0]->QuantityOnPurchaseOrder : 0,
@@ -202,7 +191,7 @@ function sage_roi_variant_product( $productObject ) {
         ),
         array(
             'attributes' => array( sanitize_title($sageAttributeKey) => $productObject->SalesUnitOfMeasure ),
-            'identifier' => 'woo-variation-identifier-' . $productObject->SalesUnitOfMeasure . '-' . $product->id,
+            'identifier' => 'woo-variation-identifier-' . $productObject->SalesUnitOfMeasure . '-' . $productId,
             'number_of_unit' => isset($productObject->SalesUMConvFct) ? $productObject->SalesUMConvFct : 1,
             'stock' => 'instock',
             'stock_qty' => count($productObject->ItemWarehouses) ? $productObject->ItemWarehouses[0]->QuantityOnSalesOrder : 0,
@@ -216,14 +205,18 @@ function sage_roi_variant_product( $productObject ) {
         $post_id_query = $wpdb->prepare( "SELECT post_id FROM {$wpdb->prefix}postmeta where meta_value = %s LIMIT 1", $variant['identifier']);
         $variationIds = $wpdb->get_col( $post_id_query );
         if(count($variationIds)) {
-            $variation = new WC_Product_Variation( $variationIds[0] );
+            try {
+                $variation = new WC_Product_Variation( $variationIds[0] );
+            } catch(Exception $e) {
+                $variation = new WC_Product_Variation();
+            }
         }
 
-        if(!$variation->id) {
+        if(!$variation->get_id()) {
             $variation = new WC_Product_Variation();
         }
 
-        $variation->set_parent_id( $product->id );
+        $variation->set_parent_id( $productId );
         $variation->set_attributes( $variant['attributes'] );
         $variation->set_stock_status( $variant['stock'] );
         $variation->set_regular_price( $variant['price'] );
@@ -231,23 +224,25 @@ function sage_roi_variant_product( $productObject ) {
         $variation->set_stock_quantity( $variant['stock_qty'] );
         $variation->save();
 
+        $variationId = $variation->get_id();
+
         sage_roi_meta_upsert( 
             'post', 
-            $variation->id, 
+            $variationId, 
             'number_of_units_package', 
             $variant['number_of_unit']
         );
 
         sage_roi_meta_upsert( 
             'post', 
-            $variation->id, 
+            $variationId, 
             'identifier',
             $variant['identifier']
         );
 
         if($variationIndex === 0) {
             // set default form values, or default variation
-            sage_roi_meta_upsert( 'post', $variation->id, '_default_attributes', $variant['attributes'], false);
+            sage_roi_meta_upsert( 'post', $variationId, '_default_attributes', $variant['attributes'], false);
         }
 
         $variationIndex++;
