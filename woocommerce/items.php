@@ -22,7 +22,7 @@ function sage_roi_items_sync_api( WP_REST_Request $request ) {
     $page = sage_roi_get_option( 'products_page_number' );
     $page = empty($page) ? 1 : $page;
     $fds = new FSD_Data_Encryption();
-    $requestURL = "https://roiconsultingapidev.azurewebsites.net/api/v2/items/search?PageNumber=$page&PageSize=20";
+    $requestURL = "https://roiconsultingapidev.azurewebsites.net/api/v2/items/search?PageNumber=$page&PageSize=5";
     $response = wp_remote_post($requestURL, array(
         'headers' => array(
             'Content-Type' => 'application/json',
@@ -113,11 +113,11 @@ function sage_roi_simple_product( $productObject ) {
 
     $product->save();
     // save post meta of product object from sage 100
-    sage_roi_meta_upsert( 'post', $product->get_id(), 'product_json', json_encode($productObject, true));
+    sage_roi_meta_upsert( 'post', $product->id, 'product_json', json_encode($productObject, true));
 
     sage_roi_meta_upsert( 
         'post', 
-        $product->get_id(), 
+        $product->id, 
         'product_unit_per_package', 
         $productObject->StandardUnitOfMeasure
     );
@@ -180,12 +180,12 @@ function sage_roi_variant_product( $productObject ) {
     $product->save();
 
     // save post meta of product object from sage 100
-    sage_roi_meta_upsert( 'post', $product->get_id(), 'product_json', json_encode($productObject, true));
+    sage_roi_meta_upsert( 'post', $product->id, 'product_json', json_encode($productObject, true));
 
     // units per package
     sage_roi_meta_upsert( 
         'post', 
-        $product->get_id(), 
+        $product->id, 
         'product_unit_per_package', 
         $productObject->StandardUnitOfMeasure
     );
@@ -194,7 +194,7 @@ function sage_roi_variant_product( $productObject ) {
     $variations = array(
         array(
             'attributes' => array( sanitize_title($sageAttributeKey) => $productObject->PurchaseUnitOfMeasure ),
-            'identifier' => 'woo-variation-identifier-' . $productObject->PurchaseUnitOfMeasure . '-' . $product->get_id(),
+            'identifier' => 'woo-variation-identifier-' . $productObject->PurchaseUnitOfMeasure . '-' . $product->id,
             'number_of_unit' => isset($productObject->PurchaseUMConvFctr) ? $productObject->PurchaseUMConvFctr : 1,
             'stock' => 'instock',
             'stock_qty' => count($productObject->ItemWarehouses) ? $productObject->ItemWarehouses[0]->QuantityOnPurchaseOrder : 0,
@@ -202,7 +202,7 @@ function sage_roi_variant_product( $productObject ) {
         ),
         array(
             'attributes' => array( sanitize_title($sageAttributeKey) => $productObject->SalesUnitOfMeasure ),
-            'identifier' => 'woo-variation-identifier-' . $productObject->SalesUnitOfMeasure . '-' . $product->get_id(),
+            'identifier' => 'woo-variation-identifier-' . $productObject->SalesUnitOfMeasure . '-' . $product->id,
             'number_of_unit' => isset($productObject->SalesUMConvFct) ? $productObject->SalesUMConvFct : 1,
             'stock' => 'instock',
             'stock_qty' => count($productObject->ItemWarehouses) ? $productObject->ItemWarehouses[0]->QuantityOnSalesOrder : 0,
@@ -219,11 +219,11 @@ function sage_roi_variant_product( $productObject ) {
             $variation = new WC_Product_Variation( $variationIds[0] );
         }
 
-        if(!$variation->get_id()) {
+        if(!$variation->id) {
             $variation = new WC_Product_Variation();
         }
 
-        $variation->set_parent_id( $product->get_id() );
+        $variation->set_parent_id( $product->id );
         $variation->set_attributes( $variant['attributes'] );
         $variation->set_stock_status( $variant['stock'] );
         $variation->set_regular_price( $variant['price'] );
@@ -233,21 +233,21 @@ function sage_roi_variant_product( $productObject ) {
 
         sage_roi_meta_upsert( 
             'post', 
-            $variation->get_id(), 
+            $variation->id, 
             'number_of_units_package', 
             $variant['number_of_unit']
         );
 
         sage_roi_meta_upsert( 
             'post', 
-            $variation->get_id(), 
+            $variation->id, 
             'identifier',
             $variant['identifier']
         );
 
         if($variationIndex === 0) {
             // set default form values, or default variation
-            sage_roi_meta_upsert( 'post', $variation->get_id(), '_default_attributes', $variant['attributes'], false);
+            sage_roi_meta_upsert( 'post', $variation->id, '_default_attributes', $variant['attributes'], false);
         }
 
         $variationIndex++;

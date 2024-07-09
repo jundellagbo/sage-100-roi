@@ -71,7 +71,7 @@ function sage_roi_add_variation_setting_fields( $loop, $variation_data, $variati
         'wrapper_class' => 'form-row',
         'description'   => __('The number of units or quantity for this package.', 'woocommerce'),
         'desc_tip'      => true,
-        'value'         => get_post_meta($variation->get_id(), $field_key, true),
+        'value'         => get_post_meta($variation->id, $field_key, true),
         'type'          => 'number'
     ) );
 }
@@ -83,7 +83,7 @@ function sage_roi_save_variation_setting_fields($variation, $i) {
     if ( isset($_POST[$field_key][$i]) ) {
         sage_roi_meta_upsert( 
             'post', 
-            $variation->get_id(), 
+            $variation->id, 
             'number_of_units_package', 
             sanitize_text_field($_POST[$field_key][$i])
         );
