@@ -107,6 +107,7 @@ function sage_roi_customers_sync( WP_REST_Request $request ) {
         sage_roi_set_option( 'customers_page_number', $page );
      } else {
         sage_roi_set_option( 'customers_page_number', 1 );
+        sage_roi_set_option( 'customer_sync_complete', 1 );
      }
 
     return $results;

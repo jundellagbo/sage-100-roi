@@ -47,6 +47,7 @@ function sage_roi_items_sync_api( WP_REST_Request $request ) {
         sage_roi_set_option( 'products_page_number', $page );
      } else {
         sage_roi_set_option( 'products_page_number', 1 );
+        sage_roi_set_option( 'items_sync_complete', 1 );
      }
     
     return $results;

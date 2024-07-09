@@ -17,6 +17,11 @@ function sage_roi_orders_sync( WP_REST_Request $request ) {
         return false;
     }
 
+    // nothing to do if all items and customers has not been completely fetched.
+    if(!sage_roi_get_option('items_sync_complete') || !sage_roi_get_option('customer_sync_complete')) {
+        return false;
+    }
+
     $code = sage_roi_token_validate();
     if($code !== 200) {
         return false;
