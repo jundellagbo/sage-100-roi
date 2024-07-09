@@ -66,7 +66,7 @@ function sage_roi_set_customer( $customerObject ) {
     $customer->set_shipping_postcode( $customerObject->ZipCode );
 
     $customer->save();
-    sage_roi_meta_upsert( 'user', $customer->id, 'customer_json', json_encode($customerObject, true));
+    sage_roi_meta_upsert( 'user', $customer->get_id(), 'customer_json', json_encode($customerObject, true));
 }
 
 function sage_roi_customers_sync( WP_REST_Request $request ) {
