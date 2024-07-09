@@ -264,3 +264,34 @@ function sage_roi_display_admin_order_list_custom_column_content( $column, $post
         // nothing to do if there is an error.
     }
 }
+
+
+# adding columns in order items.
+// Add header
+function sage_roi_action_woocommerce_admin_order_item_headers() {
+    
+    // Display the column name
+    echo '<th class="line_packing_weight sortable" data-sort="string-ins">' .  __( 'Item Code', 'woocommerce' ) . '</th>';
+    echo '<th class="line_packing_weight sortable" data-sort="string-ins">' .  __( 'Product Line', 'woocommerce' ) . '</th>';
+    echo '<th class="line_packing_weight sortable" data-sort="string-ins">' .  __( 'Units Per Package', 'woocommerce' ) . '</th>';
+    echo '<th class="line_packing_weight sortable" data-sort="string-ins">' .  __( 'Sold By', 'woocommerce' ) . '</th>';
+}
+add_action( 'woocommerce_admin_order_item_headers', 'sage_roi_action_woocommerce_admin_order_item_headers', 10, 1 );
+
+//Add content
+function sage_roi_action_woocommerce_admin_order_item_values( $product, $item, $item_id=null ) {
+    try {
+        $itemJson = get_post_meta( $item->get_id(), sage_roi_option_key('product_json' ), true );
+        $itemJson = json_decode($itemJson);
+        echo '<td>' . $itemJson->ItemCode . '</td>';
+        echo '<td>' . $itemJson->ProductLine . '</td>';
+        echo '<td>' . $itemJson->StandardUnitOfMeasure . '</td>';
+        echo '<td></td>';
+    } catch(Exception $e) {
+        echo '<td></td>';
+        echo '<td></td>';
+        echo '<td></td>';
+        echo '<td></td>';
+    }
+}
+add_action( 'woocommerce_admin_order_item_values', 'sage_roi_action_woocommerce_admin_order_item_values', 10, 3 );
