@@ -1,5 +1,7 @@
 <?php
 
+use Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController;
+
 // sage roi tab, product informations from API
 add_filter( 'woocommerce_product_data_tabs', 'sage_roi_product_tab' );
 function sage_roi_product_tab($tabs) {
@@ -311,6 +313,54 @@ function sage_roi_action_woocommerce_admin_order_item_values( $product, $item, $
 }
 add_action( 'woocommerce_admin_order_item_values', 'sage_roi_action_woocommerce_admin_order_item_values', 10, 3 );
 
-function sage_roi_sales_order_item() {
+// Add a custom metabox
+add_action( 'add_meta_boxes', 'sage_roi_admin_order_custom_metabox' );
+function sage_roi_admin_order_custom_metabox() {
+    $screen = class_exists( '\Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController' ) && wc_get_container()->get( CustomOrdersTableController::class )->custom_orders_table_usage_is_enabled()
+        ? wc_get_page_screen_id( 'shop-order' )
+        : 'shop_order';
 
+    add_meta_box(
+        'sage_roi_custom_meta_box',
+        'Sage 100',
+        'sage_roi_custom_metabox_content',
+        $screen,
+        'side',
+        'high'
+    );
+}
+
+// Metabox content
+function sage_roi_custom_metabox_content( $object ) {
+    // Get the WC_Order object
+    $order = is_a( $object, 'WP_Post' ) ? wc_get_order( $object->ID ) : $object;
+    $orderId = $order->get_order_number();
+    $orderJson = get_post_meta( $orderId, sage_roi_option_key('order_json' ), true );
+    $orderJson = json_decode($orderJson);
+    if(!isset($orderJson)) {
+        return false;
+    }
+    echo '<h4>Order Details</h4>';
+    echo '<p>Sales Order #: '.$orderJson->SalesOrderNo.'<p>';
+    echo '<p>Order Date: '.sage_roi_api_date($orderJson->OrderDate).'<p>';
+    echo '<p>Order Status: '.$orderJson->OrderStatus.'<p>';
+    echo '<p>AR Division No.: '.$orderJson->ARDivisionNo.'<p>';
+    echo '<p>Tax Schedule: '.$orderJson->TaxSchedule.'<p>';
+    echo '<p>Terms Code: '.$orderJson->TermsCode.'<p>';
+    echo '<p>Discount Rate: '.$orderJson->DiscountRate.'<p>';
+    echo '<p>Discount Amount: '.$orderJson->DiscountAmt.'<p>';
+    echo '<p>Taxable Amount: '.$orderJson->TaxableAmt.'<p>';
+    echo '<p>Non Taxable Amount: '.$orderJson->NonTaxableAmt.'<p>';
+    echo '<p>Sales Tax Amount: '.$orderJson->SalesTaxAmt.'<p>';
+    echo '<p>Freight Amount: '.$orderJson->FreightAmt.'<p>';
+    echo '<p>Deposit Amount: '.$orderJson->DepositAmt.'<p>';
+    echo '<p>Sage Contact Code: '.$orderJson->SageContactCode.'<p>';
+
+    echo '<h4>Warehouse</h4>';
+    echo '<p>'.$orderJson->Warehouse->WarehouseDesc.' - ' . $orderJson->Warehouse->WarehouseName . '<p>';
+
+    echo '<h4>Sales Person</h4>';
+    echo '<p>Division #: '.$orderJson->Salesperson->SalespersonDivisionNo.'<p>';
+    echo '<p>Sales Person #: '.$orderJson->Salesperson->SalespersonNo.'<p>';
+    echo '<p>Name: '.$orderJson->Salesperson->SalespersonName.'<p>';
 }
