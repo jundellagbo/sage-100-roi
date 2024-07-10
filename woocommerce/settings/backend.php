@@ -347,13 +347,13 @@ function sage_roi_custom_metabox_content( $object ) {
     echo '<p>AR Division No.: '.$orderJson->ARDivisionNo.'<p>';
     echo '<p>Tax Schedule: '.$orderJson->TaxSchedule.'<p>';
     echo '<p>Terms Code: '.$orderJson->TermsCode.'<p>';
-    echo '<p>Discount Rate: '.$orderJson->DiscountRate.'<p>';
-    echo '<p>Discount Amount: '.$orderJson->DiscountAmt.'<p>';
-    echo '<p>Taxable Amount: '.$orderJson->TaxableAmt.'<p>';
-    echo '<p>Non Taxable Amount: '.$orderJson->NonTaxableAmt.'<p>';
-    echo '<p>Sales Tax Amount: '.$orderJson->SalesTaxAmt.'<p>';
-    echo '<p>Freight Amount: '.$orderJson->FreightAmt.'<p>';
-    echo '<p>Deposit Amount: '.$orderJson->DepositAmt.'<p>';
+    echo '<p>Discount Rate: $'.$orderJson->DiscountRate.'<p>';
+    echo '<p>Discount Amount: $'.$orderJson->DiscountAmt.'<p>';
+    echo '<p>Taxable Amount: $'.$orderJson->TaxableAmt.'<p>';
+    echo '<p>Non Taxable Amount: $'.$orderJson->NonTaxableAmt.'<p>';
+    echo '<p>Sales Tax Amount: $'.$orderJson->SalesTaxAmt.'<p>';
+    echo '<p>Freight Amount: $'.$orderJson->FreightAmt.'<p>';
+    echo '<p>Deposit Amount: $'.$orderJson->DepositAmt.'<p>';
     echo '<p>Sage Contact Code: '.$orderJson->SageContactCode.'<p>';
 
     echo '<h4>Warehouse</h4>';
