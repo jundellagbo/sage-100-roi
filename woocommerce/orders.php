@@ -136,6 +136,9 @@ function sage_roi_set_customer_order( $orderObject ) {
 
     $order->save();
 
+    // disable sending email
+    add_filter('woocommerce_new_order_email_allows_resend', '__return_false' );
+
     // update order item metas
     foreach( $order->get_items() as $item_id => $item ) {
         $productIdForMeta = $item->get_product_id();
