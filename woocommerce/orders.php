@@ -48,12 +48,16 @@ function sage_roi_orders_sync( WP_REST_Request $request ) {
         sage_roi_set_customer_order( $orderObject );
     }
 
-    if($results->HasNext) {
+     // pagination handler
+     if($results->HasNext === true) {
         $page++;
         sage_roi_set_option( 'orders_page_number', $page );
-     } else {
+    }
+
+    if($results->HasNext === false) {
         sage_roi_set_option( 'orders_page_number', 1 );
-     }
+        sage_roi_set_option( 'orders_sync_complete', 1 );
+    }
 
     return $results;
 }
