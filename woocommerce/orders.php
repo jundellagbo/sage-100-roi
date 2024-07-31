@@ -122,7 +122,7 @@ function sage_roi_set_customer_order( $orderObject ) {
     );
 
     if(!empty($orderObject->EmailAddress)) {
-        $billing_address['email'] = strtolower($orderObject->EmailAddress);
+        $billing_address['email'] = strtolower(str_replace(',', '.', $orderObject->EmailAddress));
     }
 
     $order->set_address( $shipping_address, 'shipping' );
