@@ -112,7 +112,7 @@ function sage_roi_set_customer_order( $orderObject ) {
 
     $billing_address = array(
         'first_name' => $orderObject->BillToName,
-        'email'      => $orderObject->EmailAddress,
+        //'email'      => $orderObject->EmailAddress,
         'address_1'  => $orderObject->BillToAddress1,
         'address_2'  => $orderObject->BillToAddress2,
         'city'       => $orderObject->BillToCity,
@@ -120,6 +120,10 @@ function sage_roi_set_customer_order( $orderObject ) {
         'postcode'   => $orderObject->BillToZipCode,
         'country'    => $orderObject->BillToCountryCode
     );
+
+    if(!empty($orderObject->EmailAddress)) {
+        $billing_address['email'] = strtolower($orderObject->EmailAddress);
+    }
 
     $order->set_address( $shipping_address, 'shipping' );
     $order->set_address( $billing_address, 'billing' );
