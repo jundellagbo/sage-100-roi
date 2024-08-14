@@ -187,6 +187,6 @@ function sage_roi_api_date( $date ) {
         return null;
     }
 
-    $date = new DateTime("20230224");
+    $date = new DateTime($date);
     return $date->format("Y-m-d H:i:s");
 }
