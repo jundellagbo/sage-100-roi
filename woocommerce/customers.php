@@ -115,3 +115,11 @@ function sage_roi_customers_sync( WP_REST_Request $request ) {
 
     return $results;
 }
+
+
+add_action( 'user_register', 'sage_roi_customer_after_register', 10, 1 );
+function sage_roi_customer_after_register( $userId ) {
+    $customer = new WC_Customer( $userId );
+    // execute to sage api if there is new registered user.
+    
+}

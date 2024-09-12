@@ -267,3 +267,18 @@ function sage_roi_items_set_product( $productObject ) {
         sage_roi_simple_product( $productObject );
     }
 }
+
+
+add_action( 'before_delete_post', 'sage_roi_delete_product_sage' );
+function sage_roi_delete_product_sage( $post_id ) {
+    $product = wc_get_product( $post_id);
+    // execute to sage api.
+
+} 
+
+add_action( 'save_post', 'sage_roi_save_product_sage' );
+function sage_roi_save_product_sage($post_id){
+    $product = wc_get_product( $post_id);
+    // execute to sage api.
+    
+}
