@@ -29,7 +29,7 @@ function sage_roi_orders_sync( WP_REST_Request $request ) {
     $page = sage_roi_get_option( 'orders_page_number' );
     $page = empty($page) ? 1 : $page;
     $fds = new FSD_Data_Encryption();
-    $requestURL = "https://roiconsultingapidev.azurewebsites.net/api/v2/sales_order_history_headers/search?PageNumber=$page&PageSize=2";
+    $requestURL = sage_roi_base_endpoint("/v2/sales_order_history_headers/search?PageNumber=$page&PageSize=2");
     $response = wp_remote_post($requestURL, array(
         'headers' => array(
             'Content-Type' => 'application/json',

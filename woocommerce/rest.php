@@ -59,7 +59,7 @@ function sage_roi_token_auth( $clientIdParam=null, $clientSecretParam=null ) {
 // handling token expiration and refresh the token.
 function sage_roi_token_validate() {
     $fds = new FSD_Data_Encryption();
-    $requestURL = "https://roiconsultingapidev.azurewebsites.net/api/diagnostics/throw";
+    $requestURL = sage_roi_base_endpoint( "/diagnostics/throw" );
     $response = wp_remote_get($requestURL, array(
         'headers' => array(
             'Content-Type' => 'application/json',
@@ -78,4 +78,9 @@ function sage_roi_token_validate() {
     }
 
     return 200;
+}
+
+
+function sage_roi_base_endpoint( $api ) {
+    return "https://roiconsultingapidev.azurewebsites.net/api" . $api;
 }

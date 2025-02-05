@@ -83,7 +83,7 @@ function sage_roi_customers_sync( WP_REST_Request $request ) {
     $page = sage_roi_get_option( 'customers_page_number' );
     $page = empty($page) ? 1 : $page;
     $fds = new FSD_Data_Encryption();
-    $requestURL = "https://roiconsultingapidev.azurewebsites.net/api/v2/customers/search?PageNumber=$page&PageSize=5";
+    $requestURL = sage_roi_base_endpoint("/v2/customers/search?PageNumber=$page&PageSize=5");
     $response = wp_remote_post($requestURL, array(
         'headers' => array(
             'Content-Type' => 'application/json',
