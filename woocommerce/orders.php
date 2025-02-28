@@ -364,6 +364,10 @@ function sage_roi_submit_order_to_api( $orderId ) {
 
     $order->save();
 
+
+    # resync items after order for stock management
+    sage_roi_set_product_ids( $itemCodes );
+
     return $submitOrderResponseResults;
 }
 
