@@ -70,21 +70,36 @@ function sage_roi_product_data_tab_content() {
         'placeholder' => '',
         'name'        => sage_roi_option_key('product_unit_per_package')
     ));
+    ob_start();
+    ?>
+
+    <p class="form-field">
+      <label>Hide from customers</label>
+      <select 
+      class="sage-customer-search" 
+      multiple="multiple" 
+      style="width: 50%;" 
+      name="<?php echo sage_roi_option_key('hide_from_customers'); ?>[]" 
+      data-placeholder="<?php esc_attr_e( 'Search for a customer&hellip;', 'woocommerce' ); ?>" 
+      data-action="sage_roi_customer_search">
+        <?php 
+        $customerIds = get_post_meta( $post->ID, sage_roi_option_key('hide_from_customers'), true );
+        foreach ( $customerIds as $cust ) {
+          $customer = new WC_Customer( $cust);
+          if( is_object( $customer ) ) {
+            echo '<option value="' . esc_attr( $cust ) . '"' . selected( true, true, false ) . '>' . wp_kses_post( $customer->get_first_name() . " " . $customer->get_last_name() ) . '</option>';
+          }
+        }
+        ?>
+      </select>
+    </p>
+
+    <?php
+    echo ob_get_clean();
+
     ## ---- Content End  ---- ##
     echo '</div></div>';
 
-
-    // woocommerce_wp_select_multiple( array(
-    //     'id' => 'newoptions',
-    //     'name' => 'newoptions[]',
-    //     'class' => 'newoptions',
-    //     'label' => __('Testing Multiple Select', 'woocommerce'),
-    //     'options' => array(
-    //         '1' => 'User1',
-    //         '2' => 'User2',
-    //         '3' => 'User3',
-    //     ))
-    // );
 
 
     // FOR SAGE ROI API RESPONSE LOG
@@ -107,6 +122,14 @@ function sage_roi_save_product_custom_fields($post_id)
         $post_id, 
         'product_unit_per_package', 
         $unitsPerPackage
+    );
+
+    $hideCustomerIds = isset($_POST[sage_roi_option_key('hide_from_customers')]) ? $_POST[sage_roi_option_key('hide_from_customers')] : '';
+    sage_roi_meta_upsert( 
+      'post', 
+      $post_id, 
+      'hide_from_customers',
+      $hideCustomerIds
     );
 }
 

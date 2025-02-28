@@ -282,3 +282,34 @@ function sage_roi_save_product_sage($post_id){
     // execute to sage api.
     
 }
+
+
+function sage_roi_set_product_ids( $itemCodes = array() ) {
+
+    if(!count( $itemCodes )) {
+        return [];
+    }
+
+    $code = sage_roi_token_validate();
+    $requestURL = sage_roi_base_endpoint("/v2/items/search?PageNumber=1&PageSize=" . count( $itemCodes ));
+    $fds = new FSD_Data_Encryption();
+    $response = wp_remote_post($requestURL, array(
+        'headers' => array(
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $fds->decrypt(sage_roi_get_option('access_token'))
+        ),
+        'body' => '"x => (\"' . implode(",", $itemCodes) . '\").Contains(x.ItemCode)"'
+    ));
+
+    if ( is_wp_error( $response ) ) {
+        return $response->get_error_message();
+     }
+
+     $results = json_decode($response['body']);
+
+     foreach( $results->Results as $productObject ) {
+        sage_roi_items_set_product( $productObject );
+    }
+
+     return $results->Results;
+}

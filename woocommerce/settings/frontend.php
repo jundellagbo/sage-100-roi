@@ -83,3 +83,91 @@ function sage_roi_single_product_variation_change_script() {
 }
 
 
+
+# hide product from current user conditionally
+// add_filter( 'woocommerce_product_is_visible', 'sage_roi_conditionally_product_hidden', 10, 2 );
+// function sage_roi_conditionally_product_hidden( $is_visible, $id ) {
+//     $product   = wc_get_product( $id );
+//     if(is_object( $product )) {
+//         $is_visible = false;
+//     }
+//     // $available = $product->get_attribute( 'availability' );
+//     // if ( ! $product->is_in_stock() && ( 'Only with restock' !== $available ) ) {
+//     //     $is_visible = false;
+//     // }
+//     // return $is_visible;
+
+//     return $is_visible;
+// }
+
+// add_action('pre_get_posts', 'exclude_category_from_catalog');
+// function exclude_category_from_catalog($query) {
+//     // Check if we're in the WooCommerce main query and not in the admin area
+//     if (!is_admin() && $query->is_main_query() && is_shop()) {
+//         // Exclude products in a specific category from the catalog page
+//         $tax_query = (array) $query->get('tax_query');
+//         $tax_query[] = array(
+//             'taxonomy' => 'product_cat',
+//             'field'    => 'slug',
+//             'terms'    => array('music'), // Replace with your category slug
+//             'operator' => 'NOT IN'
+//         );
+        
+//         $query->set('tax_query', $tax_query);
+//     }
+// }
+
+
+
+// add_action( 'woocommerce_product_query', 'sage_roi_custom_pre_get_posts_query' );
+// function sage_roi_custom_pre_get_posts_query( $q ) {
+    
+//     if (is_product_category()){
+//         $term_id = get_queried_object()->term_id;
+//         // $show_hide_products = get_term_meta($term_id, 'show_hide_products', true);
+//         // if ($show_hide_products == 0){
+//         //     $tax_query = (array) $q->get( 'tax_query' );
+//         //     $tax_query[] = array(
+//         //         'taxonomy' => 'product_cat',
+//         //         'field' => 'term_id',
+//         //         'terms' => array(17),
+//         //         'operator' => 'NOT IN'
+//         //     );
+//         //     $q->set( 'tax_query', $tax_query );
+//         // }
+
+//         $tax_query = (array) $q->get( 'tax_query' );
+//         $tax_query[] = array(
+//             'taxonomy' => 'product_cat',
+//             'field' => 'term_id',
+//             'terms' => array(17),
+//             'operator' => 'NOT IN'
+//         );
+//         $q->set( 'tax_query', $tax_query );
+//     }
+    
+//     return $q;
+// }
+
+
+
+function sage_roi_custom_pre_get_posts_query( $q ) { 
+  $userId = get_current_user_id();
+  $customer = new WC_Customer( $userId );
+  if( is_object( $customer )) {
+    $args = array(
+      'relation' => 'or',
+      array(
+        'key'     => sage_roi_option_key('hide_from_customers'),
+        'compare' => "NOT EXISTS"
+      ),
+      array(
+        'key'     => sage_roi_option_key('hide_from_customers'),
+        'value' => '"('. implode('|', array( $userId )) .')"',
+        'compare' => 'NOT REGEXP'
+      ),
+    );
+    $q->set( 'meta_query', $args );
+  }
+}
+add_action( 'woocommerce_product_query', 'sage_roi_custom_pre_get_posts_query' );

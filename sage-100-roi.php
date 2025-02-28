@@ -16,6 +16,12 @@
 
  require_once __DIR__ . '/FSD_Data_Encryption.php';
 
+ require_once __DIR__ . '/asset.php';
+
+ require_once __DIR__ . '/ajax.php';
+
+ require_once __DIR__ . '/shortcode.php';
+
  add_action('admin_menu', 'sage_roi_register_my_api_keys_page');
 
 function sage_roi_register_my_api_keys_page() {
@@ -92,20 +98,25 @@ function sage_roi_meta_upsert( $type, $id, $key, $data, $usePluginKey=true ) {
         $metaKey = $key;
     }
 
-    if(!empty( $get_meta( $id, $metaKey, true ) )) {
-        $update_meta( 
-            $id, 
-            $metaKey, 
-            $data
-        );
-    } else {
-        $add_meta( 
-            $id, 
-            $metaKey, 
-            $data, 
-            true 
-        );
-    }
+    // if(!empty( $get_meta( $id, $metaKey, true ) )) {
+    //     $update_meta( 
+    //         $id, 
+    //         $metaKey, 
+    //         $data
+    //     );
+    // } else {
+    //     $add_meta( 
+    //         $id, 
+    //         $metaKey, 
+    //         $data, 
+    //         true 
+    //     );
+    // }
+    $update_meta( 
+        $id, 
+        $metaKey, 
+        $data
+    );
 }
 
 add_action( 'admin_post_sage_roi_sync_settings', 'sage_roi_sync_settings' );
