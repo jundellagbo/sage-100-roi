@@ -63,6 +63,33 @@ function sage_roi_orders_sync( WP_REST_Request $request ) {
 }
 
 
+
+function sage_roi_refetch_order( $orderId ) {
+    $code = sage_roi_token_validate();
+    $fds = new FSD_Data_Encryption();
+    $requestURL = sage_roi_base_endpoint("/v2/sales_order_history_headers/search?PageNumber=1&PageSize=1");
+    $response = wp_remote_post($requestURL, array(
+        'headers' => array(
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $fds->decrypt(sage_roi_get_option('access_token'))
+        ),
+        'body' => '"x => x.SalesOrderNo == \"' . $orderId . '\""'
+    ));
+
+    if ( is_wp_error( $response ) ) {
+        return $response->get_error_message();
+    }
+
+     $results = json_decode($response['body']);
+
+     foreach( $results->Results as $orderObject ) {
+        sage_roi_set_customer_order( $orderObject );
+    }
+
+    return $results;
+}
+
+
 function sage_roi_set_customer_order( $orderObject ) {
 
     $orderPostIds = wc_get_orders( array(
@@ -164,19 +191,19 @@ function sage_roi_set_customer_order( $orderObject ) {
 
 
 
-add_action('rest_api_init', function () {
-    register_rest_route( 'sage-roi', '/orders-sage', array(
-        'methods' => 'POST',
-        'callback' => 'sage_roi_orders_sage'
-    ));
-});
+// add_action('rest_api_init', function () {
+//     register_rest_route( 'sage-roi', '/orders-sage', array(
+//         'methods' => 'POST',
+//         'callback' => 'sage_roi_orders_sage'
+//     ));
+// });
 
 
-function sage_roi_orders_sage() {
-    $order = wc_get_order( 2623 );
+// function sage_roi_orders_sage() {
+//     $order = wc_get_order( 2623 );
 
-    return $order->get_data();
-}
+//     return $order->get_data();
+// }
 
 // add_action('woocommerce_thankyou', 'sage_roi_send_order');
 
@@ -186,19 +213,19 @@ function sage_roi_orders_sage() {
     
 // }
 
-add_action('rest_api_init', function () {
-    register_rest_route( 'sage-roi', '/orders-test', array(
-        'methods' => 'GET',
-        'callback' => 'sage_roi_orders_test',
-        'permission_callback' => function() { return true; }
-    ));
-});
+// add_action('rest_api_init', function () {
+//     register_rest_route( 'sage-roi', '/orders-test', array(
+//         'methods' => 'GET',
+//         'callback' => 'sage_roi_orders_test',
+//         'permission_callback' => function() { return true; }
+//     ));
+// });
 
 
-function sage_roi_orders_test() {
+// function sage_roi_orders_test() {
     
-    return sage_roi_submit_order_to_api( 2655 );
-}
+//     return sage_roi_submit_order_to_api( 2655 );
+// }
 
 
 function sage_roi_submit_order_to_api( $orderId ) {
@@ -360,13 +387,20 @@ function sage_roi_submit_order_to_api( $orderId ) {
 
      $submitOrderResponseResults = json_decode($submitOrderResponse['body']);
 
+     $order->update_meta_data( sage_roi_option_key( 'SalesOrderNo' ), $orderid );
+
      $order->update_meta_data( sage_roi_option_key( 'submitted_order_json' ), json_encode( $submitOrderResponseResults ) );
+
+     $order->update_meta_data( sage_roi_option_key( 'submitted_order_payload_json' ), json_encode( $args ) );
 
     $order->save();
 
 
     # resync items after order for stock management
     sage_roi_set_product_ids( $itemCodes );
+
+    # refetch updated order from SAGE to System
+    sage_roi_refetch_order( $orderId );
 
     return $submitOrderResponseResults;
 }
@@ -385,6 +419,7 @@ function sage_roi_process_order( $orderId ) {
 // Add custom order meta data to make it accessible in Order preview template
 add_filter( 'woocommerce_admin_order_preview_get_order_details', 'sage_roi_admin_order_preview_add_custom_meta_data', 10, 2 );
 function sage_roi_admin_order_preview_add_custom_meta_data( $data, $order ) {
+    $data['submitted_order_payload_json'] = get_post_meta( $order->get_id(), sage_roi_option_key( 'submitted_order_payload_json' ), true );
     $data['submit_order_json'] = get_post_meta( $order->get_id(), sage_roi_option_key( 'submitted_order_json' ), true );
     $data['order_json'] = get_post_meta( $order->get_id(), sage_roi_option_key( 'order_json' ), true );
     return $data;
@@ -401,6 +436,11 @@ function sage_roi_display_sage_json_response() {
         <h3>Sage 100 Order API Sync</h3>
         <div style="overflow-x: auto; max-width: 100%;">
             <pre>{{ data.order_json }}</pre>
+        </div>
+
+        <h3>Sage 100 Order Submission Payload</h3>
+        <div style="overflow-x: auto; max-width: 100%;">
+            <pre>{{ data.submitted_order_payload_json }}</pre>
         </div>
 
         <h3>Sage 100 Order Submission API Response</h3>

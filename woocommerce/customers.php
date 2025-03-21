@@ -43,6 +43,7 @@ function sage_roi_set_customer( $customerObject ) {
     $customer->set_email( strtolower( $customerObject->EmailAddress ) );
     $customer->set_password( wp_generate_password() );
     $customer->set_first_name( $customerObject->CustomerName );
+    $customer->set_last_name( $customerObject->CustomerName );
     
     // billing
     $customer->set_billing_address( $customerObject->AddressLine1 );
@@ -114,12 +115,4 @@ function sage_roi_customers_sync( WP_REST_Request $request ) {
     }
 
     return $results;
-}
-
-
-add_action( 'user_register', 'sage_roi_customer_after_register', 10, 1 );
-function sage_roi_customer_after_register( $userId ) {
-    $customer = new WC_Customer( $userId );
-    // execute to sage api if there is new registered user.
-    
 }

@@ -22,6 +22,8 @@
 
  require_once __DIR__ . '/shortcode.php';
 
+ require_once __DIR__ . '/force-login.php';
+
  add_action('admin_menu', 'sage_roi_register_my_api_keys_page');
 
 function sage_roi_register_my_api_keys_page() {

@@ -1,0 +1,9 @@
+.cart_item .woocommerce-Price-amount.amount,
+.wc_payment_methods,
+.wc-block-components-order-summary-item__total-price,
+.wc-block-components-order-summary-item__individual-prices,
+.wc-block-cart-item__total-price-and-sale-badge-wrapper,
+.wc-block-cart-item__prices,
+.wc-block-checkout__payment-method {
+  display: none!important;
+}

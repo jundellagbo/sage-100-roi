@@ -52,7 +52,7 @@ add_action( 'woocommerce_single_product_summary', 'sage_roi_add_content_product_
 add_action( 'wp_head', 'sage_roi_single_product_variation_style' );
 function sage_roi_single_product_variation_style() {
     global $product;
-    if ( is_product() && $product->is_type( 'variable' ) ) {
+    if ( is_object( $product ) && is_product() && $product->is_type( 'variable' ) ) {
         ?>
         <style type="text/css">
             [data-roi-sage-variation] {
@@ -67,7 +67,7 @@ function sage_roi_single_product_variation_style() {
 add_action( 'wp_footer', 'sage_roi_single_product_variation_change_script' );
 function sage_roi_single_product_variation_change_script() {
     global $product;
-    if ( is_product() && $product->is_type( 'variable' ) ) {
+    if ( is_object($product) && is_product() && $product->is_type( 'variable' ) ) {
         ?>
         <script type="text/javascript">
             function sage_roi_variation_handler() {
