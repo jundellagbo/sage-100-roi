@@ -387,11 +387,13 @@ function sage_roi_submit_order_to_api( $orderId ) {
 
      $submitOrderResponseResults = json_decode($submitOrderResponse['body']);
 
-     $order->update_meta_data( sage_roi_option_key( 'SalesOrderNo' ), $orderid );
+     $order->update_meta_data( sage_roi_option_key( 'SalesOrderNo' ), $orderId );
 
      $order->update_meta_data( sage_roi_option_key( 'submitted_order_json' ), json_encode( $submitOrderResponseResults ) );
 
      $order->update_meta_data( sage_roi_option_key( 'submitted_order_payload_json' ), json_encode( $args ) );
+
+     $order->update_meta_data( sage_roi_option_key( 'thankyou_action_done' ), true );
 
     $order->save();
 
@@ -406,11 +408,14 @@ function sage_roi_submit_order_to_api( $orderId ) {
 }
 
 
-add_action('woocommerce_checkout_order_processed', 'sage_roi_process_order');
+add_action('woocommerce_thankyou', 'sage_roi_process_order');
 
 function sage_roi_process_order( $orderId ) {
 
-    return sage_roi_submit_order_to_api( $orderId );
+    if( ! get_post_meta( $orderId, sage_roi_option_key( 'thankyou_action_done' ), true ) ) {
+
+        return sage_roi_submit_order_to_api( $orderId );
+    }
 }
 
 
