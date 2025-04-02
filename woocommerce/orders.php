@@ -360,6 +360,8 @@ function sage_roi_submit_order_to_api( $orderId ) {
         
         foreach( $productApis as $papi ) {
             if($papi->ItemCode == $pSku) {
+                $papi['StandardUnitCost'] = number_format( $papi['StandardUnitCost'], 2);
+                $papi['StandardUnitPrice'] = number_format( $papi['StandardUnitPrice'], 2);
                 $salesOrderDetails['Item'] = $papi;
             }
         }
