@@ -27,10 +27,22 @@ function sage_roi_unique_username( $username ) {
     return $original_login;
 }
 
+function sage_roi_conditionally_email_notification( $enabled, $email ) {
+    $enableEmail = sage_roi_get_option('stop_new_customer_email_notification');
+    if(!empty($enableEmail)) {
+        return false;
+    }
+    return $enabled;
+}
+
+add_filter('woocommerce_email_enabled_customer_new_account', 'sage_roi_conditionally_email_notification', 10, 2);
+add_filter('woocommerce_email_enabled_customer_reset_password', 'sage_roi_conditionally_email_notification', 10, 2);
+
 function sage_roi_set_customer( $customerObject ) {
     if(!$customerObject->EmailAddress) {
         return false;
     }
+
     $user = get_user_by( 'email', strtolower( $customerObject->EmailAddress ) );
     $userName = strtolower( $customerObject->CustomerName );
     if($user->ID) {
@@ -76,7 +88,7 @@ function sage_roi_customers_sync( WP_REST_Request $request ) {
     if(!empty(sage_roi_get_option('stop_sync_customers'))) {
         return false;
     }
-
+    
     $code = sage_roi_token_validate();
     if($code !== 200) {
         return false;

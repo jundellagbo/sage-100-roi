@@ -139,6 +139,15 @@
         Stop Customers Sync
     </label>
 
+    <label class="label-checkbox" for="<?php echo sage_roi_option_key('stop_new_customer_email_notification'); ?>">
+        <input type="checkbox" 
+        id="<?php echo sage_roi_option_key('stop_new_customer_email_notification'); ?>" 
+        name="<?php echo sage_roi_option_key('stop_new_customer_email_notification'); ?>"
+        <?php echo sage_roi_get_option('stop_new_customer_email_notification') ? "checked" : ""; ?>
+        >
+        Stop Customers Email Notification
+    </label>
+
     <label class="label-checkbox" for="<?php echo sage_roi_option_key('stop_sync_orders'); ?>">
         <input type="checkbox" 
         id="<?php echo sage_roi_option_key('stop_sync_orders'); ?>" 

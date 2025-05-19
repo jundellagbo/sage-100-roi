@@ -129,6 +129,7 @@ function sage_roi_sync_settings() {
     sage_roi_set_option( 'stop_sync_items_images', isset($_POST[sage_roi_option_key('stop_sync_items_images')]) ? 1 : null );
     sage_roi_set_option( 'stop_sync_customers', isset($_POST[sage_roi_option_key('stop_sync_customers')]) ? 1 : null );
     sage_roi_set_option( 'stop_sync_orders', isset($_POST[sage_roi_option_key('stop_sync_orders')]) ? 1 : null );
+    sage_roi_set_option( 'stop_new_customer_email_notification', isset($_POST[sage_roi_option_key('stop_new_customer_email_notification')]) ? 1 : null );
 
     // resets
     if(isset($_POST[sage_roi_option_key('reset_item_sync')])) {
