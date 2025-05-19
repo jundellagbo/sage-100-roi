@@ -95,6 +95,9 @@ function sage_roi_simple_product( $productObject ) {
     }
     // end of product category
 
+    if( $product->InactiveItem == "Y" ) {
+        $product->set_status('draft');
+    }
 
     $product->save();
 
