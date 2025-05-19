@@ -66,7 +66,7 @@ function sage_roi_product_data_tab_content() {
     woocommerce_wp_text_input( array(
         'id'          => sage_roi_option_key('product_unit_per_package'),
         'value'       => get_post_meta( $post->ID, sage_roi_option_key('product_unit_per_package'), true ),
-        'label'       => __('Units per package', 'woocommerce'),
+        'label'       => __('UNITS PER PACKAGE', 'woocommerce'),
         'placeholder' => '',
         'name'        => sage_roi_option_key('product_unit_per_package')
     ));

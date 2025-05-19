@@ -95,7 +95,7 @@ function sage_roi_simple_product( $productObject ) {
     }
     // end of product category
 
-    if( $product->InactiveItem == "Y" ) {
+    if( $productObject->InactiveItem == "Y" ) {
         $product->set_status('draft');
     }
 
@@ -127,6 +127,9 @@ function sage_roi_variant_product( $productObject ) {
     $product->set_slug( sanitize_title( $productObject->ItemCodeDesc, $productObject->ItemCode ) );
     $product->set_regular_price( $productObject->StandardUnitPrice );
     $product->set_sale_price( $productObject->SalesPromotionPrice > 0 ? $productObject->SalesPromotionPrice : null );
+    if( $productObject->InactiveItem == "Y" ) {
+        $product->set_status('draft');
+    }
 
     // attributes
     $sageAttributeKey = "SOLD BY";
@@ -316,3 +319,7 @@ function sage_roi_set_product_ids( $itemCodes = array() ) {
 
      return $results->Results;
 }
+
+
+// To prevent stock from being reduced on payment completion, it must be sage stock
+add_filter( 'woocommerce_payment_complete_reduce_order_stock', '__return_false' );
