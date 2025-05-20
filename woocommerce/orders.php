@@ -422,3 +422,36 @@ function sage_roi_display_sage_json_response() {
     <?php
     echo ob_get_clean();
 }
+
+
+
+/** Woocommerce and user last name */
+add_filter('woocommerce_checkout_fields', 'sage_roi_remove_last_name_checkout');
+function sage_roi_remove_last_name_checkout($fields) {
+    unset($fields['billing']['billing_last_name']);
+    unset($fields['shipping']['shipping_last_name']); // optional
+    return $fields;
+}
+
+
+add_filter('woocommerce_billing_fields', 'sage_roi_custom_remove_last_name_account', 20, 1);
+function sage_roi_custom_remove_last_name_account($fields) {
+    unset($fields['billing_last_name']);
+    return $fields;
+}
+
+
+add_filter('woocommerce_default_address_fields', 'sage_roi_custom_optional_last_name');
+function sage_roi_custom_optional_last_name($fields) {
+    if (isset($fields['last_name'])) {
+        $fields['last_name']['required'] = false;
+    }
+    return $fields;
+}
+
+
+add_action('woocommerce_checkout_process', function () {
+    if (empty($_POST['billing_last_name'])) {
+        $_POST['billing_last_name'] = '-';
+    }
+});

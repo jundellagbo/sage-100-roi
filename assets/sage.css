@@ -5,7 +5,8 @@
 .wc-block-cart-item__total-price-and-sale-badge-wrapper,
 .wc-block-cart-item__prices,
 .wc-block-checkout__payment-method,
-.woocommerce-page .price {
+.woocommerce-page .price,
+.wc-block-components-address-form__last_name {
   display: none!important;
 }
 

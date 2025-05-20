@@ -59,7 +59,7 @@ function sage_roi_set_customer( $customerObject ) {
     $customer->set_username( $userName );
     $customer->set_email( strtolower( $customerObject->EmailAddress ) );
     $customer->set_first_name( $customerObject->CustomerName );
-    $customer->set_last_name( $customerObject->CustomerName );
+    $customer->set_last_name( "-" );
     
     // billing
     $customer->set_billing_address( $customerObject->AddressLine1 );
@@ -69,6 +69,7 @@ function sage_roi_set_customer( $customerObject ) {
     $customer->set_billing_country( substr( $customerObject->CountryCode, 0, 2 ) );
     $customer->set_billing_email( strtolower( $customerObject->EmailAddress ) );
     $customer->set_billing_first_name( $customerObject->CustomerName );
+    $customer->set_billing_last_name( "-" );
     $customer->set_billing_phone( $customerObject->TelephoneNo );
     $customer->set_billing_postcode( $customerObject->ZipCode );
 
