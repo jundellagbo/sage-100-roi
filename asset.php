@@ -15,10 +15,12 @@ function sage_roi_admin_enqueue_scripts() {
 
 
 # frontend enqueue
-add_action( 'wp_enqueue_scripts', 'sage_roi_enqueue_scripts' );
+add_action( 'get_footer', 'sage_roi_enqueue_scripts' );
 
 function sage_roi_enqueue_scripts() {
 
-    wp_enqueue_style('sage_roi_style', plugin_dir_url( __FILE__  ) .'/assets/sage.css', array(), null, null);
+    wp_enqueue_style('sage_roi_style', plugin_dir_url( __FILE__  ) .'assets/sage.css', array(), null, null);
 
 }
+
+

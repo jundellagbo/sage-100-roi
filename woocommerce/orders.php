@@ -189,45 +189,6 @@ function sage_roi_set_customer_order( $orderObject ) {
 }
 
 
-
-
-// add_action('rest_api_init', function () {
-//     register_rest_route( 'sage-roi', '/orders-sage', array(
-//         'methods' => 'POST',
-//         'callback' => 'sage_roi_orders_sage'
-//     ));
-// });
-
-
-// function sage_roi_orders_sage() {
-//     $order = wc_get_order( 2623 );
-
-//     return $order->get_data();
-// }
-
-// add_action('woocommerce_thankyou', 'sage_roi_send_order');
-
-// function sage_roi_send_order($order_id){
-//     $order = wc_get_order( $order_id );
-//     /*** Your code ***/
-    
-// }
-
-// add_action('rest_api_init', function () {
-//     register_rest_route( 'sage-roi', '/orders-test', array(
-//         'methods' => 'GET',
-//         'callback' => 'sage_roi_orders_test',
-//         'permission_callback' => function() { return true; }
-//     ));
-// });
-
-
-// function sage_roi_orders_test() {
-    
-//     return sage_roi_submit_order_to_api( 2655 );
-// }
-
-
 function sage_roi_submit_order_to_api( $orderId ) {
 
     $order = wc_get_order( $orderId );

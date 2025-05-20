@@ -55,6 +55,8 @@ require_once __DIR__ . '/woocommerce/items.php';
 
 require_once __DIR__ . '/woocommerce/orders.php';
 
+require_once __DIR__ . '/woocommerce/cart.php';
+
 
 function sage_roi_option_key( $option ) {
     return $optionKey = 'wp_xookerdev_sage_roi_' . $option;

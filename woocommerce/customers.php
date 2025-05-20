@@ -35,8 +35,12 @@ function sage_roi_conditionally_email_notification( $enabled, $email ) {
     return $enabled;
 }
 
-add_filter('woocommerce_email_enabled_customer_new_account', 'sage_roi_conditionally_email_notification', 10, 2);
-add_filter('woocommerce_email_enabled_customer_reset_password', 'sage_roi_conditionally_email_notification', 10, 2);
+add_filter( 'woocommerce_email_enabled_customer_new_account', 'sage_roi_conditionally_email_notification', 10, 2);
+add_filter( 'woocommerce_email_enabled_customer_reset_password', 'sage_roi_conditionally_email_notification', 10, 2);
+add_filter( 'wp_new_user_notification_email', 'sage_roi_conditionally_email_notification' );
+add_filter( 'send_password_change_email', 'sage_roi_conditionally_email_notification' );
+add_filter( 'send_email_change_email', 'sage_roi_conditionally_email_notification' );
+add_filter( 'send_password_change_admin_email', 'sage_roi_conditionally_email_notification' );
 
 function sage_roi_set_customer( $customerObject ) {
     if(!$customerObject->EmailAddress) {
@@ -50,10 +54,10 @@ function sage_roi_set_customer( $customerObject ) {
     } else {
         $customer = new WC_Customer();
         $userName = sage_roi_unique_username( $userName );
+        $customer->set_password( wp_generate_password() );
     }
     $customer->set_username( $userName );
     $customer->set_email( strtolower( $customerObject->EmailAddress ) );
-    $customer->set_password( wp_generate_password() );
     $customer->set_first_name( $customerObject->CustomerName );
     $customer->set_last_name( $customerObject->CustomerName );
     

@@ -4,6 +4,46 @@
 .wc-block-components-order-summary-item__individual-prices,
 .wc-block-cart-item__total-price-and-sale-badge-wrapper,
 .wc-block-cart-item__prices,
-.wc-block-checkout__payment-method {
+.wc-block-checkout__payment-method,
+.woocommerce-page .price {
+  display: none!important;
+}
+
+.sage-roi-floating-cart {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  background: var(--e-global-color-primary);
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 60px;
+  height: 60px;
+  font-family: var(--e-global-typography-primary-font-family);
+}
+
+.sage-roi-floating-cart .sage-roi-cart-icon {
+  width: 50px;
+  fill: #fff;
+}
+
+.sage-roi-floating-cart .sage-roi-cart-count {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: #fff;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 12px;
+}
+
+
+.sage-roi-floating-cart .cart-count-hidden {
   display: none!important;
 }
