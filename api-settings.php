@@ -27,33 +27,6 @@
 <div class="wrap"></div>
     <h2>Sage 100 ROI</h2>
     <p>The values of these credentials has been securely stored and encrypted by SSL. The APP ID and Secret will automatically reset everytime you execute the Save Credentials button.</p>
-    <?php
-        // Check if status is 1 which means a successful options save just happened
-        if(isset($_GET['status']) && $_GET['status'] == 1): ?>
-            <div class="notice notice-success inline" style="margin:0;margin-bottom:20px;">
-                <p>API Credentials has been saved!</p>
-            </div>
-        <?php endif;
-    ?>
-
-    <?php
-        // Check if status is 0 which means api credentials is invalid
-        if(isset($_GET['settings']) && $_GET['settings'] == 1): ?>
-            <div class="notice notice-success inline" style="margin:0;margin-bottom:20px;">
-                <p>Settings has been saved, checked resets has been executed.</p>
-            </div>
-        <?php endif;
-    ?>
-
-
-    <?php
-        // Check if status is 0 which means api credentials is invalid
-        if(isset($_GET['status']) && $_GET['status'] == 0): ?>
-            <div class="notice notice-error inline" style="margin:0;margin-bottom:20px;">
-                <p>API Credentials verfication failed! No changes has been made.</p>
-            </div>
-        <?php endif;
-    ?>
 
     <?php
         // Check if status is 0 which means api credentials is invalid
@@ -68,6 +41,8 @@
             </div>
         <?php endif;
     ?>
+
+    <?php sage_roi_show_message_transient(); ?>
     
 
     <form action="<?php echo esc_url( admin_url('admin-post.php') ); ?>" method="POST">
@@ -182,6 +157,24 @@
 
     <input type="submit" name="submit" id="submit" class="update-button button button-primary" style="margin-bottom: 5px;" value="Save and execute resets"  />  
 </form> 
+
+<h3>Item codes sync</h3>
+<p>It will immediately pull items.</p>
+
+<form action="<?php echo esc_url( admin_url('admin-post.php') ); ?>" method="POST">
+    <?php wp_nonce_field( 'sage_roi_multiple_itemcodes_sync'); ?>
+    <input type="hidden" name="action" value="sage_roi_itemcodes_sync">
+    <label class="label-checkbox" for="<?php echo sage_roi_option_key('item_codes_sync'); ?>">
+        <textarea 
+        placeholder="Enter multiple itemcodes to sync, separated by new line."
+        id="<?php echo sage_roi_option_key('item_codes_sync'); ?>" 
+        name="<?php echo sage_roi_option_key('item_codes_sync'); ?>"
+        rows="10"
+        style="width: 100%; max-width: 300px;"
+        ></textarea>
+    </label>
+    <input type="submit" name="submit" id="submit" class="update-button button button-primary" style="margin-bottom: 5px;" value="Sync item codes"  />
+</form>
 
 
 <div class="divider"></div>

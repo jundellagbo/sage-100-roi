@@ -1,15 +1,5 @@
 <?php
 
-/** IMAGE REST API CODE */
-
-add_action('rest_api_init', function () {
-    register_rest_route( 'sage-roi', '/items-images-sync', array(
-        'methods' => 'POST',
-        'callback' => 'sage_roi_items_images_sync',
-        'permission_callback' => 'sage_roi_request_permission_callback_no_insynch'
-    ));
-});
-
 function sage_roi_items_sku_image_sync_auto_assign( $productSKU = null ) {
     global $wpdb;
 
@@ -49,7 +39,7 @@ function sage_roi_items_sku_image_sync_auto_assign( $productSKU = null ) {
     return true;
 }
 
-function sage_roi_items_images_sync( WP_REST_Request $request ) {
+function sage_roi_items_images_sync() {
     if(!empty(sage_roi_get_option('stop_sync_items_images'))) {
         return false;
     }

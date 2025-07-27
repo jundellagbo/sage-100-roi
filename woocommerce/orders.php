@@ -1,17 +1,6 @@
 <?php
 
-/** ORDERS REST API CODE */
-
-add_action('rest_api_init', function () {
-    register_rest_route( 'sage-roi', '/orders-sync', array(
-        'methods' => 'POST',
-        'callback' => 'sage_roi_orders_sync',
-        'permission_callback' => 'sage_roi_request_permission_callback'
-    ));
-});
-
-
-function sage_roi_orders_sync( WP_REST_Request $request ) {
+function sage_roi_orders_sync() {
 
     if(!empty(sage_roi_get_option('stop_sync_orders'))) {
         return false;

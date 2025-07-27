@@ -1,16 +1,5 @@
 <?php
 
-/** CUSTOMERS REST API CODE */
-
-add_action('rest_api_init', function () {
-    register_rest_route( 'sage-roi', '/customers-sync', array(
-        'methods' => 'POST',
-        'callback' => 'sage_roi_customers_sync',
-        'permission_callback' => 'sage_roi_request_permission_callback'
-    ));
-});
-
-
 function sage_roi_unique_username( $username ) {
     $theusername = str_replace(" ", "_", $username);
     $theusername = preg_replace('/[^A-Za-z0-9\-]/', '', $theusername);
@@ -89,7 +78,7 @@ function sage_roi_set_customer( $customerObject ) {
     sage_roi_meta_upsert( 'user', $customerId, 'customer_json', json_encode($customerObject, true));
 }
 
-function sage_roi_customers_sync( WP_REST_Request $request ) {
+function sage_roi_customers_sync() {
     if(!empty(sage_roi_get_option('stop_sync_customers'))) {
         return false;
     }

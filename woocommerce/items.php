@@ -1,16 +1,6 @@
 <?php
 
-/** ITEMS REST API CODE */
-
-add_action('rest_api_init', function () {
-    register_rest_route( 'sage-roi', '/items-sync', array(
-        'methods' => 'POST',
-        'callback' => 'sage_roi_items_sync_api',
-        'permission_callback' => 'sage_roi_request_permission_callback'
-    ));
-});
-
-function sage_roi_items_sync_api( WP_REST_Request $request ) {
+function sage_roi_items_sync_api() {
     if(!empty(sage_roi_get_option('stop_sync_items'))) {
         return false;
     }
@@ -39,6 +29,7 @@ function sage_roi_items_sync_api( WP_REST_Request $request ) {
 
      foreach( $results->Results as $productObject ) {
         sage_roi_items_set_product( $productObject );
+        
     }
      
      // pagination handler
@@ -55,6 +46,25 @@ function sage_roi_items_sync_api( WP_REST_Request $request ) {
     return $results;
 }
 
+
+function sage_roi_itemcode_acknowledgement( $itemCode ) {
+    $fds = new FSD_Data_Encryption();
+    $requestURL = sage_roi_base_endpoint("/v2/items/acknowledge/{$itemCode}");
+
+    $date = new DateTime('now', new DateTimeZone('UTC'));
+    $formatted = $date->format("Y-m-d\TH:i:s.v\Z");
+
+    $response = wp_remote_post($requestURL, array(
+        'headers' => array(
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $fds->decrypt(sage_roi_get_option('access_token'))
+        ),
+        'body' => wp_json_encode( array(
+            "ExternalProviderId" => "ROITEST",
+            "DateTimeProcessed" => $formatted
+        ))
+    ));
+}
 
 
 function sage_roi_simple_product( $productObject ) {
@@ -271,6 +281,10 @@ function sage_roi_items_set_product( $productObject ) {
         sage_roi_variant_product( $productObject );
     } else {
         sage_roi_simple_product( $productObject );
+    }
+
+    if( !$productObject->IsProcessed ) {
+        sage_roi_itemcode_acknowledgement( $productObject->ItemCode );
     }
 }
 

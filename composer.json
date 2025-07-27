@@ -1,0 +1,6 @@
+{
+    "name": "jundell/sage-100-roi",
+    "require": {
+        "yahnis-elsts/plugin-update-checker": "^5.6"
+    }
+}

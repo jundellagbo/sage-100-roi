@@ -7,10 +7,12 @@
  * Author: JJXooker
  * Author URI: mailto:jj@xooker.com
  * License: GPL-2.0+
- * Text Domain: sage100roi
+ * Text Domain: sage-100-roi
  * Domain Path: /languages
  *
  */
+
+  require_once plugin_dir_path( __FILE__ ) . 'vendor/autoload.php';
 
  // reference https://fullstackdigital.io/blog/how-to-safely-store-api-keys-and-access-protected-external-apis-in-wordpress/
 
@@ -123,6 +125,40 @@ function sage_roi_meta_upsert( $type, $id, $key, $data, $usePluginKey=true ) {
     );
 }
 
+
+add_action( 'admin_post_sage_roi_itemcodes_sync', 'sage_roi_itemcodes_sync' );
+function sage_roi_itemcodes_sync() {
+    check_admin_referer( 'sage_roi_multiple_itemcodes_sync');
+
+    $itemCodes = isset($_POST[sage_roi_option_key('item_codes_sync')]) ? $_POST[sage_roi_option_key('item_codes_sync')] : "";
+    $itemCodes = array_map('trim', explode("\n", $itemCodes));
+
+    if( count( $itemCodes )) {
+       sage_roi_set_product_ids( $itemCodes );
+       sage_roi_message_transient(array(
+            "status" => "success",
+            "message" => "Item Codes has been synced"
+        ));
+
+        return true;
+
+    } else {
+        sage_roi_message_transient(array(
+            "status" => "error",
+            "message" => "Please enter item codes."
+        ));
+
+        return true;
+    }
+
+    sage_roi_message_transient(array(
+        "status" => "success",
+        "message" => "Failed to sync item codes"
+    ));
+
+    return true;
+}
+
 add_action( 'admin_post_sage_roi_sync_settings', 'sage_roi_sync_settings' );
 function sage_roi_sync_settings() {
     check_admin_referer( 'sage_roi_api_options_verify');
@@ -146,7 +182,11 @@ function sage_roi_sync_settings() {
     if(isset($_POST[sage_roi_option_key('reset_orders_sync')])) {
         sage_roi_set_option( 'orders_page_number', 1 );
     }
-    wp_redirect($_SERVER['HTTP_REFERER'] . '&settings=1');
+
+    sage_roi_message_transient(array(
+        "status" => "success",
+        "message" => "Settings has been saved, checked resets has been executed."
+    ));
 }
 
 add_action( 'admin_post_sage_roi_external_api', 'sage_roi_submit_api_key' );
@@ -163,7 +203,10 @@ function sage_roi_submit_api_key() {
 
     $apiCheck = sage_roi_token_auth( $_POST[sage_roi_option_key('client_id')], $_POST[sage_roi_option_key('client_secret')] );
     if(!isset($apiCheck->access_token)) {
-        wp_redirect($_SERVER['HTTP_REFERER'] . '&status=0');
+        sage_roi_message_transient(array(
+            "status" => "error",
+            "message" => "API Credentials verfication failed! No changes has been made."
+        ));
         return false;
     }
 
@@ -195,7 +238,10 @@ function sage_roi_submit_api_key() {
     sage_roi_set_option( 'access_token', $appToken );
 
     // Redirect to same page with status=1 to show our options updated banner
-    wp_redirect($_SERVER['HTTP_REFERER'] . '&status=1');
+    sage_roi_message_transient(array(
+        "status" => "success",
+        "message" => "API Credentials has been saved!"
+    ));
 }
 
 function sage_roi_api_date( $date ) {
@@ -205,4 +251,35 @@ function sage_roi_api_date( $date ) {
 
     $date = new DateTime($date);
     return $date->format("Y-m-d H:i:s");
+}
+
+
+function sage_roi_message_transient( $args = array( "message" => "Error", "status" => "error", "redirect" => null ) ) {
+    set_transient('sage_roi_message_transient' . get_current_user_id(), $args, 30);
+    wp_redirect($_SERVER['HTTP_REFERER']);
+}
+
+function sage_roi_show_message_transient() {
+    $transient = get_transient('sage_roi_message_transient' . get_current_user_id());
+    if (!empty( $transient )):
+    ?>
+    <div class="notice notice-<?php echo $transient['status']; ?> is-dismissible" style="margin:0;margin-bottom:20px;">
+      <p><?php echo $transient['message']; ?></p>
+    </div>
+    <?php
+    delete_transient('sage_roi_message_transient' . get_current_user_id());
+    endif;
+}
+
+use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
+
+$updateChecker = PucFactory::buildUpdateChecker(
+  'https://github.com/jundellagbo/sage-100-roi',
+  __FILE__,
+  'sage-100-roi'
+);
+
+
+if( defined( 'WP_CLI') && WP_CLI ) {
+  require_once __DIR__ . '/cli.php';
 }
