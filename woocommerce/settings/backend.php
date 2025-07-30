@@ -66,7 +66,7 @@ function sage_roi_product_data_tab_content() {
     woocommerce_wp_text_input( array(
         'id'          => sage_roi_option_key('product_unit_per_package'),
         'value'       => get_post_meta( $post->ID, sage_roi_option_key('product_unit_per_package'), true ),
-        'label'       => __('UNITS PER PACKAGE', 'woocommerce'),
+        'label'       => __('UNITS OF MEASURE', 'woocommerce'),
         'placeholder' => '',
         'name'        => sage_roi_option_key('product_unit_per_package')
     ));
@@ -347,7 +347,7 @@ function sage_roi_action_woocommerce_admin_order_item_headers() {
     // echo '<th class="line_packing_weight sortable" data-sort="string-ins">' .  __( 'Item #', 'woocommerce' ) . '</th>';
     echo '<th class="line_packing_weight sortable" data-sort="string-ins">' .  __( 'Item Code', 'woocommerce' ) . '</th>';
     echo '<th class="line_packing_weight sortable" data-sort="string-ins">' .  __( 'Product Line', 'woocommerce' ) . '</th>';
-    echo '<th class="line_packing_weight sortable" data-sort="string-ins">' .  __( 'Units Per Package', 'woocommerce' ) . '</th>';
+    echo '<th class="line_packing_weight sortable" data-sort="string-ins">' .  __( 'Units of Measure', 'woocommerce' ) . '</th>';
     echo '<th class="line_packing_weight sortable" data-sort="string-ins">' .  __( 'Sold By', 'woocommerce' ) . '</th>';
 }
 add_action( 'woocommerce_admin_order_item_headers', 'sage_roi_action_woocommerce_admin_order_item_headers', 10, 1 );

@@ -195,7 +195,7 @@ function sage_roi_variant_product( $productObject ) {
         'post', 
         $productId, 
         'product_unit_per_package', 
-        $productObject->StandardUnitOfMeasure
+        $productObject->SalesUnitOfMeasure
     );
 
     // // variations
@@ -273,8 +273,8 @@ function sage_roi_items_set_product( $productObject ) {
 
     $productAttributesLists = array(
         $productObject->SalesUnitOfMeasure,
-        $productObject->PurchaseUnitOfMeasure,
-        $productObject->StandardUnitOfMeasure,
+        // $productObject->PurchaseUnitOfMeasure,
+        // $productObject->StandardUnitOfMeasure,
     );
 
     if(count(array_unique( array_filter($productAttributesLists) )) > 1) {

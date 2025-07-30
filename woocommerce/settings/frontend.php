@@ -18,7 +18,7 @@ function sage_roi_woo_show_excerpt_shop_page() {
     $productId = $product->get_id();
     $unitsPerPackage = get_post_meta( $productId, sage_roi_option_key('product_unit_per_package'), true );
     if(!empty($unitsPerPackage)) {
-        echo '<p class="'.sage_roi_option_key('product_unit_per_package').'"><small>UNITS PER PACKAGE: '.$unitsPerPackage.'</small></p>';
+        echo '<p class="'.sage_roi_option_key('product_unit_per_package').'"><small>UNITS OF MEASURE: '.$unitsPerPackage.'</small></p>';
     }
 }
 
@@ -30,7 +30,7 @@ function sage_roi_add_content_product_summary() {
 
     $unitsPerPackage = get_post_meta( $productId, sage_roi_option_key('product_unit_per_package'), true );
     if(!empty($unitsPerPackage)) {
-        echo '<p class="'.sage_roi_option_key('product_unit_per_package').'"><small>UNITS PER PACKAGE: '.$unitsPerPackage.'</small></p>';
+        echo '<p class="'.sage_roi_option_key('product_unit_per_package').'"><small>UNITS OF MEASURE: '.$unitsPerPackage.'</small></p>';
     }
 
     if($product->is_type('variable')) {
