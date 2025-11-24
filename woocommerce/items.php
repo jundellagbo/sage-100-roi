@@ -1,6 +1,6 @@
 <?php
 
-function sage_roi_items_sync_api() {
+function sage_roi_items_inprocess_sync_api() {
     if(!empty(sage_roi_get_option('stop_sync_items'))) {
         return false;
     }
@@ -35,12 +35,68 @@ function sage_roi_items_sync_api() {
      // pagination handler
      if($results->HasNext === true) {
         $page++;
+        sage_roi_set_option( 'products_inprocess_page_number', $page );
+    }
+
+    if($results->HasNext === false) {
+        sage_roi_set_option( 'products_inprocess_page_number', 1 );
+        sage_roi_set_option( 'items_inprocess_sync_complete', 1 );
+    }
+
+    if (defined('WP_CLI') && WP_CLI) {
+        WP_CLI::log("Items in process sync result:");
+        WP_CLI::log(print_r($results, true));
+    }
+    
+    return $results;
+}
+
+function sage_roi_items_all_sync_api() {
+    if(!empty(sage_roi_get_option('stop_sync_items'))) {
+        return false;
+    }
+
+    $code = sage_roi_token_validate();
+    if($code !== 200) {
+        return false;
+    }
+    $page = sage_roi_get_option( 'products_page_number' );
+    $page = empty($page) ? 1 : $page;
+    $fds = new FSD_Data_Encryption();
+    $requestURL = sage_roi_base_endpoint("/v2/items/search?PageNumber=$page&PageSize=5");
+    $response = wp_remote_post($requestURL, array(
+        'headers' => array(
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $fds->decrypt(sage_roi_get_option('access_token'))
+        ),
+        'body' => '""'
+    ));
+
+    if ( is_wp_error( $response ) ) {
+        return $response->get_error_message();
+     }
+
+     $results = json_decode($response['body']);
+
+     foreach( $results->Results as $productObject ) {
+        sage_roi_items_set_product( $productObject );
+        
+    }
+     
+     // pagination handler
+     if($results->HasNext === true) {
+        $page++;
         sage_roi_set_option( 'products_page_number', $page );
     }
 
     if($results->HasNext === false) {
         sage_roi_set_option( 'products_page_number', 1 );
         sage_roi_set_option( 'items_sync_complete', 1 );
+    }
+
+    if (defined('WP_CLI') && WP_CLI) {
+        WP_CLI::log("Items sync result:");
+        WP_CLI::log(print_r($results, true));
     }
     
     return $results;

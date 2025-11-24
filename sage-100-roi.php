@@ -3,7 +3,7 @@
  * Plugin Name: Sage API Connection to ROI Consulting
  * Plugin URI: mailto:jj@xooker.com
  * Description: Connect and sync ecommerce platform from SAGE 100 to Wordpress Woocommerce
- * Version: 1.2.1
+ * Version: 1.2.2
  * Author: JJXooker
  * Author URI: mailto:jj@xooker.com
  * License: GPL-2.0+
@@ -164,6 +164,7 @@ function sage_roi_sync_settings() {
     check_admin_referer( 'sage_roi_api_options_verify');
 
     sage_roi_set_option( 'stop_sync_items', isset($_POST[sage_roi_option_key('stop_sync_items')]) ? 1 : null );
+    sage_roi_set_option( 'stop_sync_items_inprocess', isset($_POST[sage_roi_option_key('stop_sync_items_inprocess')]) ? 1 : null );
     sage_roi_set_option( 'stop_sync_items_images', isset($_POST[sage_roi_option_key('stop_sync_items_images')]) ? 1 : null );
     sage_roi_set_option( 'stop_sync_customers', isset($_POST[sage_roi_option_key('stop_sync_customers')]) ? 1 : null );
     sage_roi_set_option( 'stop_sync_orders', isset($_POST[sage_roi_option_key('stop_sync_orders')]) ? 1 : null );
@@ -172,6 +173,9 @@ function sage_roi_sync_settings() {
     // resets
     if(isset($_POST[sage_roi_option_key('reset_item_sync')])) {
         sage_roi_set_option( 'products_page_number', 1 );
+    }
+    if(isset($_POST[sage_roi_option_key('reset_item_inprocess_sync')])) {
+        sage_roi_set_option( 'products_inprocess_page_number', 1 );
     }
     if(isset($_POST[sage_roi_option_key('reset_item_images_sync')])) {
         sage_roi_set_option( 'products_images_page_number', 1 );

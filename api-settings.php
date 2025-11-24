@@ -96,6 +96,15 @@
         Stop Item Sync
     </label>
 
+    <label class="label-checkbox" for="<?php echo sage_roi_option_key('stop_sync_items_inprocess'); ?>">
+        <input type="checkbox" 
+        id="<?php echo sage_roi_option_key('stop_sync_items_inprocess'); ?>" 
+        name="<?php echo sage_roi_option_key('stop_sync_items_inprocess'); ?>"
+        <?php echo sage_roi_get_option('stop_sync_items_inprocess') ? "checked" : ""; ?>
+        >
+        Stop Item In Process Sync
+    </label>
+
     <label class="label-checkbox" for="<?php echo sage_roi_option_key('stop_sync_items_images'); ?>">
         <input type="checkbox" 
         id="<?php echo sage_roi_option_key('stop_sync_items_images'); ?>" 
@@ -138,6 +147,11 @@
     <label class="label-checkbox" for="<?php echo sage_roi_option_key('reset_item_sync'); ?>">
         <input type="checkbox" id="<?php echo sage_roi_option_key('reset_item_sync'); ?>" name="<?php echo sage_roi_option_key('reset_item_sync'); ?>">
         Reset Item Sync (current page to sync: <?php echo sage_roi_get_option('products_page_number'); ?>)
+    </label>
+
+    <label class="label-checkbox" for="<?php echo sage_roi_option_key('reset_item_inprocess_sync'); ?>">
+        <input type="checkbox" id="<?php echo sage_roi_option_key('reset_item_inprocess_sync'); ?>" name="<?php echo sage_roi_option_key('reset_item_inprocess_sync'); ?>">
+        Reset Item In Process Sync (current page to sync: <?php echo sage_roi_get_option('products_inprocess_page_number'); ?>)
     </label>
 
     <label class="label-checkbox" for="<?php echo sage_roi_option_key('reset_item_images_sync'); ?>">
