@@ -200,7 +200,8 @@ function sage_roi_variant_product( $productObject ) {
     // attributes
     $sageAttributeKey = "SOLD BY";
     $product_attributes = array(
-        $sageAttributeKey => array($productObject->PurchaseUnitOfMeasure, $productObject->SalesUnitOfMeasure)
+        // $sageAttributeKey => array($productObject->PurchaseUnitOfMeasure, $productObject->SalesUnitOfMeasure)
+        $sageAttributeKey => array($productObject->StandardUnitOfMeasure)
     );
     $attributes = [];
     foreach ($product_attributes as $name => $value) {
@@ -328,16 +329,18 @@ function sage_roi_variant_product( $productObject ) {
 function sage_roi_items_set_product( $productObject ) {
 
     $productAttributesLists = array(
-        $productObject->SalesUnitOfMeasure,
+        $productObject->StandardUnitOfMeasure,
         // $productObject->PurchaseUnitOfMeasure,
         // $productObject->StandardUnitOfMeasure,
     );
 
-    if(count(array_unique( array_filter($productAttributesLists) )) > 1) {
-        sage_roi_variant_product( $productObject );
-    } else {
-        sage_roi_simple_product( $productObject );
-    }
+    sage_roi_simple_product( $productObject );
+
+    // if(count(array_unique( array_filter($productAttributesLists) )) > 1) {
+    //     sage_roi_variant_product( $productObject );
+    // } else {
+    //     sage_roi_simple_product( $productObject );
+    // }
 
     if( !$productObject->IsProcessed ) {
         sage_roi_itemcode_acknowledgement( $productObject->ItemCode );
