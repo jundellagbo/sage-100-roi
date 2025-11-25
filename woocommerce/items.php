@@ -140,6 +140,8 @@ function sage_roi_simple_product( $productObject ) {
     }
     $product->set_stock_status('instock');
 
+    $product->set_attributes( array() );
+
     // product category
     if(isset( $productObject->IM_ProductLine->ProductLineDesc )) {
         $categorySlug = strtolower($productObject->IM_ProductLine->ProductLineDesc);
