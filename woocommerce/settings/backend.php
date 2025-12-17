@@ -70,6 +70,15 @@ function sage_roi_product_data_tab_content() {
         'placeholder' => '',
         'name'        => sage_roi_option_key('product_unit_per_package')
     ));
+
+    woocommerce_wp_text_input( array(
+        'id'          => sage_roi_option_key('product_custom_category'),
+        'value'       => get_post_meta( $post->ID, sage_roi_option_key('product_custom_category'), true ),
+        'label'       => __('CUSTOM CATEGORY', 'woocommerce'),
+        'placeholder' => '',
+        'name'        => sage_roi_option_key('product_custom_category')
+    ));
+    
     ob_start();
     ?>
 
@@ -122,6 +131,14 @@ function sage_roi_save_product_custom_fields($post_id)
         $post_id, 
         'product_unit_per_package', 
         $unitsPerPackage
+    );
+
+    $customCategory = isset($_POST[sage_roi_option_key('product_custom_category')]) ? $_POST[sage_roi_option_key('product_custom_category')] : '';
+    sage_roi_meta_upsert( 
+        'post', 
+        $post_id, 
+        'product_custom_category', 
+        $customCategory
     );
 
     $hideCustomerIds = isset($_POST[sage_roi_option_key('hide_from_customers')]) ? $_POST[sage_roi_option_key('hide_from_customers')] : '';

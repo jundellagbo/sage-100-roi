@@ -145,6 +145,12 @@ function sage_roi_simple_product( $productObject ) {
     // product category
     if(isset( $productObject->IM_ProductLine->ProductLineDesc )) {
         $categorySlug = strtolower($productObject->IM_ProductLine->ProductLineDesc);
+
+        $customCategory = get_post_meta( $product->get_id(), sage_roi_option_key('product_custom_category'), true );
+        if(!empty($customCategory)) {
+            $categorySlug = strtolower($customCategory);
+        }
+
         if($category = get_term_by( 'slug', $categorySlug, 'product_cat' )) {
             $categoryId = $category->term_id;
             if(!isset($categoryId)) {
@@ -224,6 +230,12 @@ function sage_roi_variant_product( $productObject ) {
     // product category
     if(isset( $productObject->IM_ProductLine->ProductLineDesc )) {
         $categorySlug = strtolower($productObject->IM_ProductLine->ProductLineDesc);
+
+        $customCategory = get_post_meta( $product->get_id(), sage_roi_option_key('product_custom_category'), true );
+        if(!empty($customCategory)) {
+            $categorySlug = strtolower($customCategory);
+        }
+        
         if($category = get_term_by( 'slug', $categorySlug, 'product_cat' )) {
             $categoryId = $category->term_id;
             if(!isset($categoryId)) {
