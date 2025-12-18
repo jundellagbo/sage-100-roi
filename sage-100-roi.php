@@ -3,7 +3,7 @@
  * Plugin Name: Sage API Connection to ROI Consulting
  * Plugin URI: mailto:jj@xooker.com
  * Description: Connect and sync ecommerce platform from SAGE 100 to Wordpress Woocommerce
- * Version: 1.2.4
+ * Version: 1.6.4
  * Author: JJXooker
  * Author URI: mailto:jj@xooker.com
  * License: GPL-2.0+
