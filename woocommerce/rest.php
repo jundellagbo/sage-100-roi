@@ -30,11 +30,22 @@ function sage_roi_request_permission_callback_no_insynch( WP_REST_Request $reque
 }
 
 // if param is provided then use the param values, otherwise use the get_option values, they are optionals.
-function sage_roi_token_auth( $clientIdParam=null, $clientSecretParam=null ) {
+function sage_roi_token_auth() {
+
     $fds = new FSD_Data_Encryption();
-    $clientId = $clientIdParam ? $clientIdParam : $fds->decrypt(sage_roi_get_option('client_id'));
-    $clientSecret = $clientSecretParam ? $clientSecretParam : $fds->decrypt(sage_roi_get_option('client_secret'));
-    $requestURL = "https://login.microsoftonline.com/974b2ee7-8fca-4ab4-948a-02becfbf058f/oauth2/v2.0/token";
+
+    $isProduction = sage_roi_get_option('use_production');
+    $clientId = $fds->decrypt(sage_roi_get_option('client_id'));
+    $clientSecret = $fds->decrypt(sage_roi_get_option('client_secret'));
+    $clientScope = $fds->decrypt(sage_roi_get_option('client_scope'));
+
+    if($isProduction) {
+        $clientId = $fds->decrypt(sage_roi_get_option('client_id_production'));
+        $clientSecret = $fds->decrypt(sage_roi_get_option('client_secret_production'));
+        $clientScope = $fds->decrypt(sage_roi_get_option('client_scope_production'));
+    }
+
+    $requestURL = $fds->decrypt(sage_roi_get_option('oauth_token_url'));
 
     $response = wp_remote_post($requestURL, array(
         'method' => 'POST',
@@ -45,7 +56,7 @@ function sage_roi_token_auth( $clientIdParam=null, $clientSecretParam=null ) {
             'grant_type' => 'client_credentials',
             'client_id' => $clientId,
             'client_secret' => $clientSecret,
-            'scope' => 'api://e18be6e0-2a6b-4f6d-b38b-dd9c3c34b141/.default'
+            'scope' => $clientScope
         )
     ));
 
@@ -82,5 +93,10 @@ function sage_roi_token_validate() {
 
 
 function sage_roi_base_endpoint( $api ) {
-    return "https://roiconsultingapidev.azurewebsites.net/api" . $api;
+    $isProduction = sage_roi_get_option('use_production');
+    if($isProduction) {
+        return "https://roiconsultingapi.azurewebsites.net/api" . $api;
+    } else {
+        return "https://roiconsultingapidev.azurewebsites.net/api" . $api;
+    }
 }

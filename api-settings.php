@@ -48,35 +48,23 @@
     <form action="<?php echo esc_url( admin_url('admin-post.php') ); ?>" method="POST">
         <!-- The nonce field is a security feature to avoid submissions from outside WP admin -->
         <?php wp_nonce_field( 'sage_roi_api_options_verify'); ?>
+        <h1>Microsoft Oauth Token URL</h1>
+        <input type="text" name="<?php echo sage_roi_option_key('oauth_token_url'); ?>" value="<?php echo $fds->decrypt( sage_roi_get_option('oauth_token_url') ); ?>" placeholder="Enter Microsoft Oauth Token URL" class="apisettinginput">
+        <h2>Development Credentials</h2>
         <input type="password" name="<?php echo sage_roi_option_key('client_id'); ?>" value="<?php echo $fds->decrypt( sage_roi_get_option('client_id') ); ?>" placeholder="Enter Client ID" class="apisettinginput">
         <input type="password" name="<?php echo sage_roi_option_key('client_secret'); ?>" value="<?php echo $fds->decrypt( sage_roi_get_option('client_secret') ); ?>" placeholder="Enter Client Secret" class="apisettinginput">
-        <input type="hidden" name="action" value="sage_roi_external_api">			 
-        <input type="submit" name="submit" id="submit" class="update-button button button-primary" value="Save Credentials"  />
+        <input type="password" name="<?php echo sage_roi_option_key('client_scope'); ?>" value="<?php echo $fds->decrypt( sage_roi_get_option('client_scope') ); ?>" placeholder="Enter Client Scope" class="apisettinginput">
+        <h2>Production Credentials</h2>
+        <input type="password" name="<?php echo sage_roi_option_key('client_id_production'); ?>" value="<?php echo $fds->decrypt( sage_roi_get_option('client_id_production') ); ?>" placeholder="Enter Client ID" class="apisettinginput">
+        <input type="password" name="<?php echo sage_roi_option_key('client_secret_production'); ?>" value="<?php echo $fds->decrypt( sage_roi_get_option('client_secret_production') ); ?>" placeholder="Enter Client Secret" class="apisettinginput">
+        <input type="password" name="<?php echo sage_roi_option_key('client_scope_production'); ?>" value="<?php echo $fds->decrypt( sage_roi_get_option('client_scope_production') ); ?>" placeholder="Enter Client Scope" class="apisettinginput">
+        <input type="checkbox" name="<?php echo sage_roi_option_key('use_production'); ?>" value="1" <?php echo sage_roi_get_option('use_production') ? "checked" : ""; ?>> Use Production Credentials
+        <div style="margin-top: 10px;">
+            <input type="hidden" name="action" value="sage_roi_external_api">			 
+            <input type="submit" name="submit" id="submit" class="update-button button button-primary" value="Save Credentials"  />
+        </div>
     </form> 
 </div>
-
-<div class="divider"></div>
-
-<h2>Application Details</h2>
-<p>APP ID: 
-    <code>
-        <?php if(isset($_GET['showSecret']) && $_GET['showSecret'] == 1):  ?>
-            <?php echo $fds->decrypt(sage_roi_get_option('app_password_id')); ?>
-        <?php else: ?>
-            <?php echo str_repeat("*", 20); ?>
-        <?php endif; ?>
-    </code>
-</p>
-<p>APP Secret: 
-    <code>
-        <?php if(isset($_GET['showSecret']) && $_GET['showSecret'] == 1):  ?>
-            <?php echo $fds->decrypt(sage_roi_get_option('app_password_secret')); ?>
-        <?php else: ?>
-            <?php echo str_repeat("*", 50); ?>
-        <?php endif; ?>
-    </code>
-</p>
-<p><a href="<?php echo $_SERVER['REQUEST_URI']; ?>&showSecret=1">Show App Details</a></p>
 
 
 <div class="divider"></div>

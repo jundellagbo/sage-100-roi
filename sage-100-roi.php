@@ -207,13 +207,18 @@ function sage_roi_submit_api_key() {
     check_admin_referer( 'sage_roi_api_options_verify');
     $data_encryption = new FSD_Data_Encryption();
 
-    $apiCheck = sage_roi_token_auth( $_POST[sage_roi_option_key('client_id')], $_POST[sage_roi_option_key('client_secret')] );
-    if(!isset($apiCheck->access_token)) {
-        sage_roi_message_transient(array(
-            "status" => "error",
-            "message" => "API Credentials verfication failed! No changes has been made."
-        ));
-        return false;
+    // use production
+    if (isset($_POST[sage_roi_option_key('use_production')])) {
+        $wpSageRoiUseProduction = sanitize_text_field( $_POST[sage_roi_option_key('use_production')] );
+        sage_roi_set_option( 'use_production', $wpSageRoiUseProduction );
+    }
+
+
+    // oauth token url
+    if (isset($_POST[sage_roi_option_key('oauth_token_url')])) {
+        $wpSageRoiOauthTokenUrl = sanitize_text_field( $_POST[sage_roi_option_key('oauth_token_url')] );
+        $encryptedRoiOauthTokenUrl = $data_encryption->encrypt($wpSageRoiOauthTokenUrl);
+        sage_roi_set_option( 'oauth_token_url', $encryptedRoiOauthTokenUrl );
     }
 
     // client ID
@@ -230,6 +235,34 @@ function sage_roi_submit_api_key() {
         sage_roi_set_option( 'client_secret', $encryptedRoiClientSecret );
     }
 
+    // client scope
+    if (isset($_POST[sage_roi_option_key('client_scope')])) {
+        $wpSageRoiClientScope = sanitize_text_field( $_POST[sage_roi_option_key('client_scope')] );
+        $encryptedRoiClientScope = $data_encryption->encrypt($wpSageRoiClientScope);
+        sage_roi_set_option( 'client_scope', $encryptedRoiClientScope );
+    }
+
+    // client ID production
+    if (isset($_POST[sage_roi_option_key('client_id_production')])) {
+        $wpSageRoiClientIdProduction = sanitize_text_field( $_POST[sage_roi_option_key('client_id_production')] );
+        $encryptedRoiClientIdProduction = $data_encryption->encrypt($wpSageRoiClientIdProduction);
+        sage_roi_set_option( 'client_id_production', $encryptedRoiClientIdProduction );
+    }
+
+    // client secret production
+    if (isset($_POST[sage_roi_option_key('client_secret_production')])) {
+        $wpSageRoiClientSecretProduction = sanitize_text_field( $_POST[sage_roi_option_key('client_secret_production')] );
+        $encryptedRoiClientSecretProduction = $data_encryption->encrypt($wpSageRoiClientSecretProduction);
+        sage_roi_set_option( 'client_secret_production', $encryptedRoiClientSecretProduction );
+    }
+
+    // client scope production
+    if (isset($_POST[sage_roi_option_key('client_scope_production')])) {
+        $wpSageRoiClientScopeProduction = sanitize_text_field( $_POST[sage_roi_option_key('client_scope_production')] );
+        $encryptedRoiClientScopeProduction = $data_encryption->encrypt($wpSageRoiClientScopeProduction);
+        sage_roi_set_option( 'client_scope_production', $encryptedRoiClientScopeProduction );
+    }
+
     // for App password ID
     $appPassword = $data_encryption->encrypt(uniqid('app_id'));
     sage_roi_set_option( 'app_password_id', $appPassword );
@@ -238,6 +271,16 @@ function sage_roi_submit_api_key() {
     // for App Password Secret
     $appSecret = $data_encryption->encrypt(sha1(time()));
     sage_roi_set_option( 'app_password_secret', $appSecret );
+
+
+    $apiCheck = sage_roi_token_auth();
+    if(!isset($apiCheck->access_token)) {
+        sage_roi_message_transient(array(
+            "status" => "error",
+            "message" => "API Credentials verfication failed!"
+        ));
+        return false;
+    }
 
     // access token of API
     $appToken = $data_encryption->encrypt($apiCheck->access_token);
