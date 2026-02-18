@@ -48,3 +48,7 @@
 .sage-roi-floating-cart .cart-count-hidden {
   display: none!important;
 }
+
+.woocommerce-MyAccount-content {
+  min-height: 500px;
+}
