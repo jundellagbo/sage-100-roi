@@ -255,6 +255,16 @@ function sage_roi_submit_order_to_api( $orderId ) {
         "BillToZipCode" => $customer->get_billing_postcode(),
         "BillToCountryCode" => $customer->get_billing_country(),
         "EmailAddress" => $customer->get_billing_email(),
+        "ShipVia" => "COMP TRUCK",
+        "ShipToCode" => "01",
+        "ShipToName" => $order->get_shipping_first_name() ?: $order->get_billing_first_name(),
+        "ShipToAddress1" => $order->get_shipping_address_1() ?: $order->get_billing_address_1(),
+        "ShipToAddress2" => $order->get_shipping_address_2() ?: $order->get_billing_address_2(),
+        "ShipToAddress3" => "",
+        "ShipToCity" => $order->get_shipping_city() ?: $order->get_billing_city(),
+        "ShipToState" => $order->get_shipping_state() ?: $order->get_billing_state(),
+        "ShipToZipCode" => $order->get_shipping_postcode() ?: $order->get_billing_postcode(),
+        "ShipToCountryCode" => $order->get_shipping_country() ?: $order->get_billing_country(),
         "SalesOrderDetails" => array()
     );
 
