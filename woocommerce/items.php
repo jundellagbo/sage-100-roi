@@ -138,9 +138,10 @@ function sage_roi_simple_product( $productObject ) {
     if(count($productObject->ItemWarehouses)) {
         $product->set_stock_quantity( $productObject->ItemWarehouses[0]->QuantityOnHand );
     }
+    $product->set_manage_stock(false);
     $product->set_stock_status('instock');
-
     $product->set_attributes( array() );
+    $product->set_short_description( '' );
 
     // product category
     if(isset( $productObject->IM_ProductLine->ProductLineDesc )) {
@@ -221,7 +222,7 @@ function sage_roi_variant_product( $productObject ) {
         $attributes[] = $attribute;
     }
     $product->set_attributes($attributes);
-    $product->set_manage_stock(true);
+    $product->set_manage_stock(false);
     if(count($productObject->ItemWarehouses)) {
         $product->set_stock_quantity( $productObject->ItemWarehouses[0]->QuantityOnHand );
     }
@@ -379,34 +380,49 @@ function sage_roi_save_product_sage($post_id){
 
 function sage_roi_set_product_ids( $itemCodes = array() ) {
 
-    if(!count( $itemCodes )) {
+    if ( ! count( $itemCodes ) ) {
         return [];
     }
 
     $code = sage_roi_token_validate();
-    $requestURL = sage_roi_base_endpoint("/v2/items/search?PageNumber=1&PageSize=" . count( $itemCodes ));
+    $requestURL = sage_roi_base_endpoint( '/v2/items/search?PageNumber=1&PageSize=' . count( $itemCodes ) );
     $fds = new FSD_Data_Encryption();
-    $response = wp_remote_post($requestURL, array(
+
+    // Exact match: ItemCode == "code1" || ItemCode == "code2" (no array.Contains - API has no LINQ)
+    $quoted = array_map( function ( $c ) {
+        return '"' . str_replace( array( '\\', '"' ), array( '\\\\', '\\"' ), (string) $c ) . '"';
+    }, $itemCodes );
+    $filter = 'x => ' . implode( ' || ', array_map( function ( $q ) {
+        return 'x.ItemCode == ' . $q;
+    }, $quoted ) );
+    $body   = wp_json_encode( $filter );
+
+    $response = wp_remote_post( $requestURL, array(
         'headers' => array(
-            'Content-Type' => 'application/json',
-            'Authorization' => 'Bearer ' . $fds->decrypt(sage_roi_get_option('access_token'))
+            'Content-Type'  => 'application/json',
+            'Authorization' => 'Bearer ' . $fds->decrypt( sage_roi_get_option( 'access_token' ) )
         ),
-        'body' => '"x => (\"' . implode(",", $itemCodes) . '\").Contains(x.ItemCode)"'
-    ));
+        'body' => $body,
+    ) );
 
     if ( is_wp_error( $response ) ) {
         return $response->get_error_message();
-     }
+    }
 
-     $results = json_decode($response['body']);
+    $results = json_decode( $response['body'] );
+    if ( empty( $results->Results ) ) {
+        return [];
+    }
 
-     foreach( $results->Results as $productObject ) {
+    foreach ( $results->Results as $productObject ) {
         sage_roi_items_set_product( $productObject );
     }
 
-     return $results->Results;
+    return $results->Results;
 }
 
 
 // To prevent stock from being reduced on payment completion, it must be sage stock
 add_filter( 'woocommerce_payment_complete_reduce_order_stock', '__return_false' );
+
+add_action( 'woocommerce_reduce_order_stock', 'sage_roi_reduce_order_stock', 10, 2 );

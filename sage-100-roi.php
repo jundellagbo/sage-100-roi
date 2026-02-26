@@ -68,15 +68,12 @@ function sage_roi_option_key( $option ) {
 
 function sage_roi_set_option( $option, $value ) {
     $optionKey = sage_roi_option_key($option);
-    if(is_null($value)) {
+    if ( is_null( $value ) ) {
         delete_option( $optionKey );
         return false;
     }
-    if (!empty(get_option( $optionKey ))) {
-        update_option( $optionKey, $value);
-    } else {
-        add_option( $optionKey, $value);
-    }
+    // update_option adds the option if it doesn't exist; use it so values like '0' can be stored and later changed
+    update_option( $optionKey, $value );
 }
 
 function sage_roi_get_option( $option, $default="" ) {
@@ -207,11 +204,10 @@ function sage_roi_submit_api_key() {
     check_admin_referer( 'sage_roi_api_options_verify');
     $data_encryption = new FSD_Data_Encryption();
 
-    // use production
-    if (isset($_POST[sage_roi_option_key('use_production')])) {
-        $wpSageRoiUseProduction = sanitize_text_field( $_POST[sage_roi_option_key('use_production')] );
-        sage_roi_set_option( 'use_production', $wpSageRoiUseProduction );
-    }
+    // use production (checkbox: present = checked, absent = unchecked)
+    $key = sage_roi_option_key('use_production');
+    $wpSageRoiUseProduction = isset($_POST[$key]) ? sanitize_text_field($_POST[$key]) : '0';
+    sage_roi_set_option( 'use_production', $wpSageRoiUseProduction );
 
 
     // oauth token url

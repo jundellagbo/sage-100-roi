@@ -6,7 +6,8 @@
 .wc-block-cart-item__prices,
 .wc-block-checkout__payment-method,
 .woocommerce-page .price,
-.wc-block-components-address-form__last_name {
+.wc-block-components-address-form__last_name,
+.product .price {
   display: none!important;
 }
 

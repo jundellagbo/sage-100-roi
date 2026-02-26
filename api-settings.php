@@ -44,6 +44,9 @@
 
     <?php sage_roi_show_message_transient(); ?>
     
+    <h2>
+        Currently Endpoint: <?php echo sage_roi_base_endpoint( "/v2" ); ?>
+    </h2>
 
     <form action="<?php echo esc_url( admin_url('admin-post.php') ); ?>" method="POST">
         <!-- The nonce field is a security feature to avoid submissions from outside WP admin -->

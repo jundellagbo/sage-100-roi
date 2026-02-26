@@ -293,41 +293,37 @@ function sage_roi_submit_order_to_api( $orderId ) {
         if( $product->is_type('simple') ) {
             $salesOrderDetails['UnitOfMeasure'] = get_post_meta( $product->get_id(), sage_roi_option_key('product_unit_per_package'), true );
         }
-
         
         // Only for product variation
-        if( $product->is_type('variation') ) {
-                // Get the variation attributes
-            $variation_attributes = $product->get_variation_attributes();
-            // Loop through each selected attributes
-            foreach($variation_attributes as $attribute_taxonomy => $term_slug ) {
-                // Get product attribute name or taxonomy
-                $taxonomy = str_replace('attribute_', '', $attribute_taxonomy );
-                // The label name from the product attribute
-                $attribute_name = wc_attribute_label( $taxonomy, $product );
-                // The term name (or value) from this attribute
-                if( taxonomy_exists($taxonomy) ) {
-                    $attribute_value = get_term_by( 'slug', $term_slug, $taxonomy )->name;
-                } else {
-                    $attribute_value = $term_slug; // For custom product attributes
-                }
+        // if( $product->is_type('variation') ) {
+        //         // Get the variation attributes
+        //     $variation_attributes = $product->get_variation_attributes();
+        //     // Loop through each selected attributes
+        //     foreach($variation_attributes as $attribute_taxonomy => $term_slug ) {
+        //         // Get product attribute name or taxonomy
+        //         $taxonomy = str_replace('attribute_', '', $attribute_taxonomy );
+        //         // The label name from the product attribute
+        //         $attribute_name = wc_attribute_label( $taxonomy, $product );
+        //         // The term name (or value) from this attribute
+        //         if( taxonomy_exists($taxonomy) ) {
+        //             $attribute_value = get_term_by( 'slug', $term_slug, $taxonomy )->name;
+        //         } else {
+        //             $attribute_value = $term_slug; // For custom product attributes
+        //         }
 
-                $salesOrderDetails['UnitOfMeasure'] = $attribute_value;
-            }
-        }
-
+        //         $salesOrderDetails['UnitOfMeasure'] = $attribute_value;
+        //     }
+        // }
         
-        
-        foreach( $productApis as $papi ) {
-            if($papi->ItemCode == $pSku) {
-                $papi->StandardUnitCost = number_format( $papi->StandardUnitCost, 2);
-                $papi->StandardUnitPrice = number_format( $papi->StandardUnitPrice, 2);
-                $salesOrderDetails['Item'] = $papi;
-            }
+        // foreach( $productApis as $papi ) {
+        //     if($papi->ItemCode == $pSku) {
+        //         $papi->StandardUnitCost = number_format( $papi->StandardUnitCost, 2);
+        //         $papi->StandardUnitPrice = number_format( $papi->StandardUnitPrice, 2);
+        //         $salesOrderDetails['Item'] = $papi;
+        //     }
 
-            error_log( "API TEST " . json_encode($papi));
-        }
-
+        //     error_log( "API TEST " . json_encode($papi));
+        // }
 
         $args['SalesOrderDetails'][] = $salesOrderDetails;
     }
