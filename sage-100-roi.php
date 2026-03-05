@@ -308,8 +308,8 @@ function sage_roi_show_message_transient() {
     $transient = get_transient('sage_roi_message_transient' . get_current_user_id());
     if (!empty( $transient )):
     ?>
-    <div class="notice notice-<?php echo $transient['status']; ?> is-dismissible" style="margin:0;margin-bottom:20px;">
-      <p><?php echo $transient['message']; ?></p>
+    <div class="notice notice-<?php echo esc_attr( $transient['status'] ); ?> is-dismissible" style="margin:0;margin-bottom:20px;">
+      <p><?php echo esc_html( $transient['message'] ); ?></p>
     </div>
     <?php
     delete_transient('sage_roi_message_transient' . get_current_user_id());

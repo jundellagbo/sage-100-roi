@@ -25,7 +25,7 @@ function sage_roi_customer_search() {
     echo json_encode([]);
   }
 
-  $search_term = $_GET['term'];
+  $search_term = sanitize_text_field( $_GET['term'] );
 
   $args = array();
 
