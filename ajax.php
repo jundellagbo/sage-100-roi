@@ -23,6 +23,7 @@ function sage_roi_customer_search() {
   sage_roi_nonce_get_check();
   if(!isset( $_GET['term'] )) {
     echo json_encode([]);
+    die();
   }
 
   $search_term = sanitize_text_field( $_GET['term'] );

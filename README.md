@@ -74,11 +74,11 @@ sage-100-roi/
 ├── cli.php                   # WP-CLI command definitions
 ├── force-login.php           # Force-login redirect + draft product category support
 ├── shortcode.php             # Shortcode definitions
-├── woo-dashboard.php         # WooCommerce account page customisation
+├── woo-dashboard.php         # WooCommerce account page customization
 ├── FSD_Data_Encryption.php   # AES-256 encryption/decryption helper
 ├── woocommerce/
 │   ├── rest.php              # REST API endpoints and OAuth token management
-│   ├── woocommerce.php       # WooCommerce initialisation
+│   ├── woocommerce.php       # WooCommerce initialization
 │   ├── items.php             # Product/item sync
 │   ├── images.php            # Product image sync
 │   ├── customers.php         # Customer sync
