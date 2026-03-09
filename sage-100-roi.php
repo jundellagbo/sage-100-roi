@@ -160,36 +160,36 @@ function sage_roi_itemcodes_sync() {
 
 add_action( 'admin_post_sage_roi_sync_settings', 'sage_roi_sync_settings' );
 function sage_roi_sync_settings() {
-    check_admin_referer( 'sage_roi_api_options_verify');
+    check_admin_referer( 'sage_roi_api_options_verify' );
 
-    sage_roi_set_option( 'stop_sync_items', isset($_POST[sage_roi_option_key('stop_sync_items')]) ? 1 : null );
-    sage_roi_set_option( 'stop_sync_items_inprocess', isset($_POST[sage_roi_option_key('stop_sync_items_inprocess')]) ? 1 : null );
-    sage_roi_set_option( 'stop_sync_items_images', isset($_POST[sage_roi_option_key('stop_sync_items_images')]) ? 1 : null );
-    sage_roi_set_option( 'stop_sync_customers', isset($_POST[sage_roi_option_key('stop_sync_customers')]) ? 1 : null );
-    sage_roi_set_option( 'stop_sync_orders', isset($_POST[sage_roi_option_key('stop_sync_orders')]) ? 1 : null );
-    sage_roi_set_option( 'stop_new_customer_email_notification', isset($_POST[sage_roi_option_key('stop_new_customer_email_notification')]) ? 1 : null );
-
-    // resets
-    if(isset($_POST[sage_roi_option_key('reset_item_sync')])) {
-        sage_roi_set_option( 'products_page_number', 1 );
-    }
-    if(isset($_POST[sage_roi_option_key('reset_item_inprocess_sync')])) {
-        sage_roi_set_option( 'products_inprocess_page_number', 1 );
-    }
-    if(isset($_POST[sage_roi_option_key('reset_item_images_sync')])) {
-        sage_roi_set_option( 'products_images_page_number', 1 );
-    }
-    if(isset($_POST[sage_roi_option_key('reset_customers_sync')])) {
-        sage_roi_set_option( 'customers_page_number', 1 );
-    }
-    if(isset($_POST[sage_roi_option_key('reset_orders_sync')])) {
-        sage_roi_set_option( 'orders_page_number', 1 );
+    $stop_options = array(
+        'stop_sync_items', 'stop_sync_items_inprocess', 'stop_sync_items_images',
+        'stop_sync_customers', 'stop_sync_customers_inprocess', 'stop_sync_orders',
+        'stop_new_customer_email_notification'
+    );
+    foreach ( $stop_options as $opt ) {
+        $key = sage_roi_option_key( $opt );
+        sage_roi_set_option( $opt, isset( $_POST[ $key ] ) ? 1 : null );
     }
 
-    sage_roi_message_transient(array(
-        "status" => "success",
-        "message" => "Settings has been saved, checked resets has been executed."
-    ));
+    $resets = array(
+        'reset_item_sync'             => 'products_page_number',
+        'reset_item_inprocess_sync'    => 'products_inprocess_page_number',
+        'reset_item_images_sync'       => 'products_images_page_number',
+        'reset_customers_sync'         => 'customers_page_number',
+        'reset_customers_inprocess_sync' => 'customers_inprocess_page_number',
+        'reset_orders_sync'            => 'orders_page_number',
+    );
+    foreach ( $resets as $reset_key => $page_option ) {
+        if ( isset( $_POST[ sage_roi_option_key( $reset_key ) ] ) ) {
+            sage_roi_set_option( $page_option, 1 );
+        }
+    }
+
+    sage_roi_message_transient( array(
+        'status'  => 'success',
+        'message' => 'Settings has been saved, checked resets has been executed.',
+    ) );
 }
 
 add_action( 'admin_post_sage_roi_external_api', 'sage_roi_submit_api_key' );
