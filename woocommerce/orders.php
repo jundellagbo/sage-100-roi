@@ -450,3 +450,47 @@ add_action('woocommerce_checkout_process', function () {
         $_POST['billing_last_name'] = '-';
     }
 });
+
+
+/** Reorder button */
+add_filter('woocommerce_my_account_my_orders_actions', 'sage_roi_add_reorder_button', 10, 2);
+function sage_roi_add_reorder_button($actions, $order) {
+    if (!$order->has_status(['completed', 'processing'])) return $actions;
+    $actions['reorder'] = ['url' => wp_nonce_url(add_query_arg('reorder', $order->get_id()), 'woocommerce-reorder'), 'name' => __('Reorder', 'sage-100-roi')];
+    return $actions;
+}
+
+add_action('wp_loaded', 'sage_roi_handle_reorder_request', 20);
+function sage_roi_handle_reorder_request() {
+    if (!isset($_GET['reorder']) || empty($_GET['_wpnonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_GET['_wpnonce'])), 'woocommerce-reorder')) {
+        return;
+    }
+    $order_id = absint($_GET['reorder']);
+    $order = wc_get_order($order_id);
+    if (!$order || $order->get_customer_id() !== get_current_user_id()) {
+        wc_add_notice(__('Invalid reorder request.', 'sage-100-roi'), 'error');
+        wp_safe_redirect(wc_get_account_endpoint_url('orders'));
+        exit;
+    }
+    WC()->cart->empty_cart();
+    foreach ($order->get_items() as $item) {
+        if (!$item->is_type('line_item')) {
+            continue;
+        }
+        $product = $item->get_product();
+        if (!$product || !$product->exists()) {
+            continue;
+        }
+        $variation_id = $item->get_variation_id();
+        $variation = $variation_id ? $item->get_variation() : array();
+        WC()->cart->add_to_cart($item->get_product_id(), $item->get_quantity(), $variation_id, $variation);
+    }
+    wc_add_notice(__('Order items have been added to your cart.', 'sage-100-roi'), 'success');
+    wp_safe_redirect(wc_get_cart_url());
+    exit;
+}
+
+
+/** Disable stock management for all products */
+add_filter('woocommerce_product_get_manage_stock', '__return_false');
+add_filter('woocommerce_product_variation_get_manage_stock', '__return_false');

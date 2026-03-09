@@ -311,7 +311,7 @@ function sage_roi_variant_product( $productObject ) {
         $variation->set_attributes( $variant['attributes'] );
         $variation->set_stock_status( $variant['stock'] );
         $variation->set_regular_price( $variant['price'] );
-        $variation->set_manage_stock(true);
+        $variation->set_manage_stock(false);
         $variation->set_stock_quantity( $variant['stock_qty'] );
         $variation->save();
 
