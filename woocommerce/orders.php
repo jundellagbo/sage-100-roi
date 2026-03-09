@@ -1,5 +1,30 @@
 <?php
 
+function sage_roi_orders_acknowledgement( $orders = array() ) {
+    if ( sage_roi_token_validate() !== 200 ) {
+        return;
+    }
+    $fds = new FSD_Data_Encryption();
+    $requestURL = sage_roi_base_endpoint("/v2/sales_order_history_headers/batch/acknowledge");
+    $date = new DateTime('now', new DateTimeZone('UTC'));
+    $formatted = $date->format("Y-m-d\TH:i:s.v\Z");
+    $acknowledgeOrders = array();
+    foreach ($orders as $order) {
+        $acknowledgeOrders[] = array(
+            'DateTimeProcessed' => $formatted,
+            'SalesOrderNo' => $order['SalesOrderNo'],
+            'CompanyCode' => $order['CompanyCode'] ?? ''
+        );
+    }
+    $response = wp_remote_post($requestURL, array(
+        'headers' => array(
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $fds->decrypt(sage_roi_get_option('access_token'))
+        ),
+        'body' => json_encode($acknowledgeOrders)
+    ));
+}
+
 function sage_roi_orders_sync() {
 
     if(!empty(sage_roi_get_option('stop_sync_orders'))) {
@@ -33,8 +58,19 @@ function sage_roi_orders_sync() {
 
      $results = json_decode($response['body']);
 
+     $acknowledgeOrders = array();
      foreach( $results->Results as $orderObject ) {
         sage_roi_set_customer_order( $orderObject );
+        if( !$orderObject->IsProcessed ) {
+            $acknowledgeOrders[] = array(
+                'SalesOrderNo' => $orderObject->SalesOrderNo,
+                'CompanyCode' => $orderObject->CompanyCode ?? ''
+            );
+        }
+    }
+
+    if( count( $acknowledgeOrders ) ) {
+        sage_roi_orders_acknowledgement( $acknowledgeOrders );
     }
 
      // pagination handler
@@ -71,8 +107,17 @@ function sage_roi_refetch_order( $orderId ) {
 
      $results = json_decode($response['body']);
 
-     foreach( $results->Results as $orderObject ) {
-        sage_roi_set_customer_order( $orderObject );
+     $acknowledgeOrders = array();
+     sage_roi_set_customer_order( $results->Results[0] );
+     if( !$results->Results[0]->IsProcessed ) {
+        $acknowledgeOrders[] = array(
+            'SalesOrderNo' => $results->Results[0]->SalesOrderNo,
+            'CompanyCode' => $results->Results[0]->CompanyCode ?? ''
+        );
+     }
+
+    if( count( $acknowledgeOrders ) ) {
+        sage_roi_orders_acknowledgement( $acknowledgeOrders );
     }
 
     return $results;
@@ -200,33 +245,10 @@ function sage_roi_submit_order_to_api( $orderId ) {
     }
 
     // refetching and auto update customer record from SAGE API
-    $fds = new FSD_Data_Encryption();
-    $customerRequestURL = sage_roi_base_endpoint("/v2/customers/search");
-    $customerResponse = wp_remote_post($customerRequestURL, array(
-        'headers' => array(
-            'Content-Type' => 'application/json',
-            'Authorization' => 'Bearer ' . $fds->decrypt(sage_roi_get_option('access_token'))
-        ),
-        'body' => '"x => x.CustomerNo == \"' . $customerJson->CustomerNo . '\""'
-    ));
-
-    if ( is_wp_error( $customerResponse ) ) {
-        return $customerResponse->get_error_message();
-     }
-
-     $customerResponseResults = json_decode($customerResponse['body']);
-    
-    // end here if there is no record, disregard the process
-    if(!count($customerResponseResults->Results)) {
-      return false;
+    $fetchedCustomer = sage_roi_get_customer_in_sage( $customerJson->EmailAddress );
+    if( !$fetchedCustomer ) {
+        return false;
     }
-
-
-    $fetchedCustomer = $customerResponseResults->Results[0];
-
-    // update customer record from SAGE 100
-    sage_roi_set_customer( $fetchedCustomer );
-
 
     // refetch fresh customer update
     $customer = new WC_Customer( $customerId );
@@ -384,6 +406,11 @@ function sage_roi_process_order( $orderId ) {
 // Add custom order meta data to make it accessible in Order preview template
 add_filter( 'woocommerce_admin_order_preview_get_order_details', 'sage_roi_admin_order_preview_add_custom_meta_data', 10, 2 );
 function sage_roi_admin_order_preview_add_custom_meta_data( $data, $order ) {
+    $email = $order->get_billing_email();
+    $customer = $email ? sage_roi_get_customer_in_sage( $email ) : false;
+    $data['sage_roi_customer_not_in_sage'] = empty( $customer ) || is_string( $customer );
+
+    $data['sage_roi_sales_order_no'] = get_post_meta( $order->get_id(), sage_roi_option_key( 'SalesOrderNo' ), true );
     $data['submitted_order_payload_json'] = get_post_meta( $order->get_id(), sage_roi_option_key( 'submitted_order_payload_json' ), true );
     $data['submit_order_json'] = get_post_meta( $order->get_id(), sage_roi_option_key( 'submitted_order_json' ), true );
     $data['order_json'] = get_post_meta( $order->get_id(), sage_roi_option_key( 'order_json' ), true );
@@ -393,27 +420,33 @@ function sage_roi_admin_order_preview_add_custom_meta_data( $data, $order ) {
 // Display custom values in Order preview
 add_action( 'woocommerce_admin_order_preview_end', 'sage_roi_display_sage_json_response' );
 function sage_roi_display_sage_json_response() {
-    // Call the stored value and display it
     ob_start();
     ?>
     <div class="wc-order-preview-address w-full" style="padding: 15px;">
-
+        <# if ( data.sage_roi_customer_not_in_sage ) { #>
+        <div style="background:#BD312D;color:#fff;padding:12px 0;text-align:center;font-weight:bold;margin-bottom:15px;z-index:99999;">
+            <span>This customer is not in SAGE 100 records. Incoming or current orders cannot be processed in SAGE 100.</span>
+        </div>
+        <# } #>
+        <# if ( data.order_json ) { #>
         <h3>Sage 100 Order API Sync</h3>
         <div style="overflow-x: auto; max-width: 100%;">
             <pre>{{ data.order_json }}</pre>
         </div>
-
+        <# } #>
+        <# if ( data.submitted_order_payload_json ) { #>
         <h3>Sage 100 Order Submission Payload</h3>
         <div style="overflow-x: auto; max-width: 100%;">
             <pre>{{ data.submitted_order_payload_json }}</pre>
         </div>
-
+        <# } #>
+        <# if ( data.submit_order_json ) { #>
         <h3>Sage 100 Order Submission API Response</h3>
         <div style="overflow-x: auto; max-width: 100%;">
             <pre>{{ data.submit_order_json }}</pre>
         </div>
+        <# } #>
     </div>
-
     <?php
     echo ob_get_clean();
 }

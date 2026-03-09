@@ -27,9 +27,20 @@ function sage_roi_items_inprocess_sync_api() {
 
      $results = json_decode($response['body']);
 
+     $acknowledgeItemCodes = array();
      foreach( $results->Results as $productObject ) {
         sage_roi_items_set_product( $productObject );
-        
+
+        if( !$productObject->IsProcessed ) {
+            $acknowledgeItemCodes[] = array(
+                'ItemCode' => $productObject->ItemCode,
+                'CompanyCode' => $productObject->CompanyCode ?? ''
+            );
+        }
+    }
+
+    if( count( $acknowledgeItemCodes ) ) {
+        sage_roi_items_acknowledgement( $acknowledgeItemCodes );
     }
      
      // pagination handler
@@ -78,9 +89,20 @@ function sage_roi_items_all_sync_api() {
 
      $results = json_decode($response['body']);
 
+     $acknowledgeItemCodes = array();
      foreach( $results->Results as $productObject ) {
         sage_roi_items_set_product( $productObject );
         
+        if( !$productObject->IsProcessed ) {
+            $acknowledgeItemCodes[] = array(
+                'ItemCode' => $productObject->ItemCode,
+                'CompanyCode' => $productObject->CompanyCode ?? ''
+            );
+        }
+    }
+
+    if( count( $acknowledgeItemCodes ) ) {
+        sage_roi_items_acknowledgement( $acknowledgeItemCodes );
     }
      
      // pagination handler
@@ -103,22 +125,31 @@ function sage_roi_items_all_sync_api() {
 }
 
 
-function sage_roi_itemcode_acknowledgement( $itemCode ) {
+function sage_roi_items_acknowledgement( $items = array() ) {
+    if ( sage_roi_token_validate() !== 200 ) {
+        return;
+    }
     $fds = new FSD_Data_Encryption();
-    $requestURL = sage_roi_base_endpoint("/v2/items/acknowledge/{$itemCode}");
+    $requestURL = sage_roi_base_endpoint("/v2/items/batch/acknowledge");
 
     $date = new DateTime('now', new DateTimeZone('UTC'));
     $formatted = $date->format("Y-m-d\TH:i:s.v\Z");
+
+    $acknowledgeItems = array();
+    foreach ($items as $item) {
+        $acknowledgeItems[] = array(
+            'DateTimeProcessed' => $formatted,
+            'ItemCode' => $item['ItemCode'] ?? '',
+            'CompanyCode' => $item['CompanyCode'] ?? ''
+        );
+    }
 
     $response = wp_remote_post($requestURL, array(
         'headers' => array(
             'Content-Type' => 'application/json',
             'Authorization' => 'Bearer ' . $fds->decrypt(sage_roi_get_option('access_token'))
         ),
-        'body' => wp_json_encode( array(
-            "ExternalProviderId" => "ROITEST",
-            "DateTimeProcessed" => $formatted
-        ))
+        'body' => json_encode($acknowledgeItems)
     ));
 }
 
@@ -356,10 +387,6 @@ function sage_roi_items_set_product( $productObject ) {
     // } else {
     //     sage_roi_simple_product( $productObject );
     // }
-
-    if( !$productObject->IsProcessed ) {
-        sage_roi_itemcode_acknowledgement( $productObject->ItemCode );
-    }
 }
 
 
@@ -414,8 +441,20 @@ function sage_roi_set_product_ids( $itemCodes = array() ) {
         return [];
     }
 
+    $acknowledgeItemCodes = array();
+
     foreach ( $results->Results as $productObject ) {
         sage_roi_items_set_product( $productObject );
+        if( !$productObject->IsProcessed ) {
+            $acknowledgeItemCodes[] = array(
+                'ItemCode' => $productObject->ItemCode,
+                'CompanyCode' => $productObject->CompanyCode ?? ''
+            );
+        }
+    }
+
+    if( count( $acknowledgeItemCodes ) ) {
+        sage_roi_items_acknowledgement( $acknowledgeItemCodes );
     }
 
     return $results->Results;

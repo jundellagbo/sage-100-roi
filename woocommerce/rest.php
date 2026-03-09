@@ -100,3 +100,12 @@ function sage_roi_base_endpoint( $api ) {
         return "https://roiconsultingapidev.azurewebsites.net/api" . $api;
     }
 }
+
+function sage_roi_acknowledgement_external_provider_id() {
+    $isProduction = sage_roi_get_option('use_production');
+    if($isProduction) {
+        return "ROI";
+    } else {
+        return "ROITEST";
+    }
+}

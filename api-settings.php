@@ -114,6 +114,15 @@
         Stop Customers Sync
     </label>
 
+    <label class="label-checkbox" for="<?php echo sage_roi_option_key('stop_sync_customers_inprocess'); ?>">
+        <input type="checkbox" 
+        id="<?php echo sage_roi_option_key('stop_sync_customers_inprocess'); ?>" 
+        name="<?php echo sage_roi_option_key('stop_sync_customers_inprocess'); ?>"
+        <?php echo sage_roi_get_option('stop_sync_customers_inprocess') ? "checked" : ""; ?>
+        >
+        Stop Customers In Process Sync
+    </label>
+
     <label class="label-checkbox" for="<?php echo sage_roi_option_key('stop_new_customer_email_notification'); ?>">
         <input type="checkbox" 
         id="<?php echo sage_roi_option_key('stop_new_customer_email_notification'); ?>" 

@@ -17,6 +17,11 @@ class SageROICLIClass extends WP_CLI_COMMAND {
     WP_CLI::success( "Customers has been synced" );
   }
 
+  public function customers_inprocess_sync() {
+    sage_roi_customers_inprocess_sync_api();
+    WP_CLI::success( "Customers in process has been synced" );
+  }
+
   public function orders_sync() {
     sage_roi_orders_sync();
     WP_CLI::success( "Orders has been synced" );
