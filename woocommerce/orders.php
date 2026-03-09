@@ -1,5 +1,27 @@
 <?php
 
+function sage_roi_orders_acknowledgement( $orders = array() ) {
+    $fds = new FSD_Data_Encryption();
+    $requestURL = sage_roi_base_endpoint("/v2/sales_order_history_headers/batch/acknowledge");
+    $date = new DateTime('now', new DateTimeZone('UTC'));
+    $formatted = $date->format("Y-m-d\TH:i:s.v\Z");
+    $acknowledgeOrders = array();
+    foreach ($orders as $order) {
+        $acknowledgeOrders[] = array(
+            'DateTimeProcessed' => $formatted,
+            'SalesOrderNo' => $order['SalesOrderNo'],
+            'CompanyCode' => $order['CompanyCode'] ?? ''
+        );
+    }
+    $response = wp_remote_post($requestURL, array(
+        'headers' => array(
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $fds->decrypt(sage_roi_get_option('access_token'))
+        ),
+        'body' => json_encode($acknowledgeOrders)
+    ));
+}
+
 function sage_roi_orders_sync() {
 
     if(!empty(sage_roi_get_option('stop_sync_orders'))) {
@@ -33,8 +55,19 @@ function sage_roi_orders_sync() {
 
      $results = json_decode($response['body']);
 
+     $acknowledgeOrders = array();
      foreach( $results->Results as $orderObject ) {
         sage_roi_set_customer_order( $orderObject );
+        if( !$orderObject->IsProcessed ) {
+            $acknowledgeOrders[] = array(
+                'SalesOrderNo' => $orderObject->SalesOrderNo,
+                'CompanyCode' => $orderObject->CompanyCode ?? ''
+            );
+        }
+    }
+
+    if( count( $acknowledgeOrders ) ) {
+        sage_roi_orders_acknowledgement( $acknowledgeOrders );
     }
 
      // pagination handler
@@ -71,8 +104,17 @@ function sage_roi_refetch_order( $orderId ) {
 
      $results = json_decode($response['body']);
 
-     foreach( $results->Results as $orderObject ) {
-        sage_roi_set_customer_order( $orderObject );
+     $acknowledgeOrders = array();
+     sage_roi_set_customer_order( $results->Results[0] );
+     if( !$results->Results[0]->IsProcessed ) {
+        $acknowledgeOrders[] = array(
+            'SalesOrderNo' => $results->Results[0]->SalesOrderNo,
+            'CompanyCode' => $results->Results[0]->CompanyCode ?? ''
+        );
+     }
+
+    if( count( $acknowledgeOrders ) ) {
+        sage_roi_orders_acknowledgement( $acknowledgeOrders );
     }
 
     return $results;
