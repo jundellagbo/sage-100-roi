@@ -336,17 +336,19 @@ function sage_roi_display_admin_order_list_custom_column_content( $column, $post
         switch ( $column )
         {
             case 'sage_roi_SalesOrderNo' :
-                echo $orderJson->SalesOrderNo;
+                echo isset($orderJson->SalesOrderNo) ? esc_html($orderJson->SalesOrderNo) : '&mdash;';
             break;
 
             case 'sage_roi_customer_number':
-                if($orderJson->Customer->CustomerNo) {
-                    echo $orderJson->Customer->ARDivisionNo."-".$orderJson->Customer->CustomerNo;
-                }       
+                if (isset($orderJson->Customer) && isset($orderJson->Customer->ARDivisionNo) && isset($orderJson->Customer->CustomerNo)) {
+                    echo esc_html($orderJson->Customer->ARDivisionNo . "-" . $orderJson->Customer->CustomerNo);
+                } else {
+                    echo '&mdash;';
+                }
             break;
 
             case 'sage_roi_store_code':
-                echo $orderJson->Customer->CustomerNo;
+                echo (isset($orderJson->Customer) && isset($orderJson->Customer->CustomerNo)) ? esc_html($orderJson->Customer->CustomerNo) : '&mdash;';
             break;
         }
 
@@ -371,33 +373,23 @@ add_action( 'woocommerce_admin_order_item_headers', 'sage_roi_action_woocommerce
 
 //Add content
 function sage_roi_action_woocommerce_admin_order_item_values( $product, $item, $item_id=null ) {
-    global $post;
-    $orderId = $post->ID;
     $itemId = $item->get_id();
-    try {
-        $itemMetaJson = wc_get_order_item_meta($itemId, sage_roi_option_key('order_item_json'));
-        $itemMetaJson = json_decode($itemMetaJson);
-        $itemJson = $itemMetaJson->Item;
+    $itemMetaJson = json_decode( wc_get_order_item_meta( $itemId, sage_roi_option_key( 'order_item_json' ), true ) );
 
-        $quantity = $itemJson->QuantityOrderedOriginal;
-        if($itemJson->QuantityOrderedOriginal !== $itemJson->QuantityOrderedRevised) {
-            $quantity = $itemJson->QuantityOrderedRevised;
-        }
-
-        $unitMeasure = (int) $itemMetaJson->UnitOfMeasureConvFactor;
-        $unitMeasure = $unitMeasure<=1?"":$unitMeasure;
-        // echo '<td>' . $itemMetaJson->AliasItemNo . '</td>';
-        echo '<td>' . $itemJson->ItemCode . '</td>';
-        echo '<td>' . $itemJson->ProductLine . '</td>';
-        echo '<td>' . $itemJson->StandardUnitOfMeasure . '</td>';
-        echo '<td>' . $unitMeasure . " " . $itemMetaJson->UnitOfMeasure . '</td>';
-    } catch(Exception $e) {
-        // echo '<td></td>';
-        echo '<td></td>';
-        echo '<td></td>';
-        echo '<td></td>';
-        echo '<td></td>';
+    if ( ! $itemMetaJson || ! isset( $itemMetaJson->Item ) ) {
+        echo '<td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td>';
+        return;
     }
+
+    $itemJson = $itemMetaJson->Item;
+    $unitMeasure = (int) ( $itemMetaJson->UnitOfMeasureConvFactor ?? 0 );
+    $unitMeasure = $unitMeasure <= 1 ? '' : $unitMeasure;
+    $unitOfMeasure = $itemMetaJson->UnitOfMeasure ?? '';
+
+    echo '<td>' . esc_html( $itemJson->ItemCode ?? '' ) . '</td>';
+    echo '<td>' . esc_html( $itemJson->ProductLine ?? '' ) . '</td>';
+    echo '<td>' . esc_html( $itemJson->StandardUnitOfMeasure ?? '' ) . '</td>';
+    echo '<td>' . esc_html( trim( $unitMeasure . ' ' . $unitOfMeasure ) ) . '</td>';
 }
 add_action( 'woocommerce_admin_order_item_values', 'sage_roi_action_woocommerce_admin_order_item_values', 10, 3 );
 
