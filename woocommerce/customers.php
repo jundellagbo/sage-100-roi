@@ -1,6 +1,9 @@
 <?php
 
 function sage_roi_customers_acknowledgement( $customers = array() ) {
+    if ( sage_roi_token_validate() !== 200 ) {
+        return;
+    }
     $fds = new FSD_Data_Encryption();
     $requestURL = sage_roi_base_endpoint("/v2/customers/batch/acknowledge");
 

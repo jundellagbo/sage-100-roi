@@ -126,6 +126,9 @@ function sage_roi_items_all_sync_api() {
 
 
 function sage_roi_items_acknowledgement( $items = array() ) {
+    if ( sage_roi_token_validate() !== 200 ) {
+        return;
+    }
     $fds = new FSD_Data_Encryption();
     $requestURL = sage_roi_base_endpoint("/v2/items/batch/acknowledge");
 

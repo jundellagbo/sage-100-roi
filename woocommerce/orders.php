@@ -1,6 +1,9 @@
 <?php
 
 function sage_roi_orders_acknowledgement( $orders = array() ) {
+    if ( sage_roi_token_validate() !== 200 ) {
+        return;
+    }
     $fds = new FSD_Data_Encryption();
     $requestURL = sage_roi_base_endpoint("/v2/sales_order_history_headers/batch/acknowledge");
     $date = new DateTime('now', new DateTimeZone('UTC'));
