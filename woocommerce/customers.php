@@ -122,3 +122,91 @@ function sage_roi_customers_sync() {
 
     return $results;
 }
+
+function sage_roi_get_customer_in_sage( $email = null ) {
+    if ( ! $email ) {
+        $current_user = wp_get_current_user();
+        if ( $current_user && ! empty( $current_user->user_email ) ) {
+            $email = $current_user->user_email;
+        }
+    }
+
+    if ( ! $email ) {
+        return false;
+    }
+
+    // Use a separate cache for each email per day
+    $cache_key = 'sage_roi_sage_customer_' . md5( strtolower( $email ) ) . '_' . date('Ymd');
+    $cached_customer = get_transient( $cache_key );
+
+    if ( false !== $cached_customer ) {
+        if ( $cached_customer === '_not_found_' ) {
+            return false;
+        }
+        if ( is_string($cached_customer) && strpos($cached_customer, 'Error:') === 0 ) {
+            return $cached_customer;
+        }
+        return $cached_customer;
+    }
+
+    $code = sage_roi_token_validate();
+    if ( $code !== 200 ) {
+        return false;
+    }
+
+    $fds = new FSD_Data_Encryption();
+    $customerRequestURL = sage_roi_base_endpoint("/v2/customers/search");
+    $customerResponse = wp_remote_post($customerRequestURL, array(
+        'headers' => array(
+            'Content-Type'  => 'application/json',
+            'Authorization' => 'Bearer ' . $fds->decrypt(sage_roi_get_option('access_token'))
+        ),
+        'body' => '"x => x.EmailAddress == \"' . $email . '\""'
+    ));
+
+    if ( is_wp_error( $customerResponse ) ) {
+        set_transient( $cache_key, 'Error:' . $customerResponse->get_error_message(), DAY_IN_SECONDS );
+        return $customerResponse->get_error_message();
+    }
+
+    $customerResponseResults = json_decode($customerResponse['body']);
+
+    if ( ! isset($customerResponseResults->Results) || ! count($customerResponseResults->Results) ) {
+        set_transient( $cache_key, '_not_found_', DAY_IN_SECONDS );
+        return false;
+    }
+
+    $fetchedCustomer = $customerResponseResults->Results[0];
+    sage_roi_set_customer( $fetchedCustomer );
+    set_transient( $cache_key, $fetchedCustomer, DAY_IN_SECONDS );
+
+    return $fetchedCustomer;
+}
+
+
+// Show an alert at the very top of the header if current user is not in Sage
+add_action('wp_body_open', function() {
+    // Only show for logged-in users on the front-end (never in wp-admin)
+    if ( is_admin() ) {
+        return;
+    }
+    if ( !is_user_logged_in() ) {
+        return;
+    }
+    $user = wp_get_current_user();
+    if ( ! $user || empty( $user->user_email ) ) {
+        return;
+    }
+
+    // Check if user exists in Sage
+    $customer = sage_roi_get_customer_in_sage( $user->user_email );
+
+    if ( ! $customer ) {
+        // Basic style for top notification bar
+        ?>
+        <div style="background:var( --e-global-color-primary );color:#fff;padding:12px 0;text-align:center;font-weight:bold;position:sticky;top:0;left:0;width:100%;z-index:99999;">
+            <span>We're sorry, but your account is not in SAGE 100 records. We cannot process your orders in SAGE 100. Please contact support.</span>
+        </div>
+        <?php
+    }
+});
