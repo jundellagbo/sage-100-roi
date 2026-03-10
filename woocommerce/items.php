@@ -1,31 +1,5 @@
 <?php
 
-add_action( 'init', 'sage_roi_products_menu_order_support', 20 );
-function sage_roi_products_menu_order_support() {
-    add_post_type_support( 'product', 'page-attributes' );
-}
-
-add_action( 'pre_get_posts', 'sage_roi_admin_products_sort_by_menu_order', 5 );
-function sage_roi_admin_products_sort_by_menu_order( $query ) {
-    global $pagenow;
-    if ( ! is_admin() || 'edit.php' !== $pagenow ) {
-        return;
-    }
-    if ( ! isset( $_GET['post_type'] ) || 'product' !== $_GET['post_type'] ) {
-        return;
-    }
-    if ( isset( $_GET['orderby'] ) ) {
-        return;
-    }
-    $query->set( 'orderby', 'menu_order' );
-    $query->set( 'order', 'ASC' );
-}
-
-add_filter( 'woocommerce_default_catalog_orderby', 'sage_roi_default_catalog_orderby' );
-function sage_roi_default_catalog_orderby() {
-    return 'menu_order';
-}
-
 function sage_roi_items_inprocess_sync_api() {
     if(!empty(sage_roi_get_option('stop_sync_items'))) {
         return false;
