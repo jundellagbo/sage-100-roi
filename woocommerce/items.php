@@ -1,5 +1,31 @@
 <?php
 
+add_action( 'init', 'sage_roi_products_menu_order_support', 20 );
+function sage_roi_products_menu_order_support() {
+    add_post_type_support( 'product', 'page-attributes' );
+}
+
+add_action( 'pre_get_posts', 'sage_roi_admin_products_sort_by_menu_order', 5 );
+function sage_roi_admin_products_sort_by_menu_order( $query ) {
+    global $pagenow;
+    if ( ! is_admin() || 'edit.php' !== $pagenow ) {
+        return;
+    }
+    if ( ! isset( $_GET['post_type'] ) || 'product' !== $_GET['post_type'] ) {
+        return;
+    }
+    if ( isset( $_GET['orderby'] ) ) {
+        return;
+    }
+    $query->set( 'orderby', 'menu_order' );
+    $query->set( 'order', 'ASC' );
+}
+
+add_filter( 'woocommerce_default_catalog_orderby', 'sage_roi_default_catalog_orderby' );
+function sage_roi_default_catalog_orderby() {
+    return 'menu_order';
+}
+
 function sage_roi_items_inprocess_sync_api() {
     if(!empty(sage_roi_get_option('stop_sync_items'))) {
         return false;
@@ -160,6 +186,8 @@ function sage_roi_simple_product( $productObject ) {
     $product_id = wc_get_product_id_by_sku( $productObject->ItemCode );
     if($product_id) {
         $product = new WC_Product( $product_id );
+    } else {
+        $product->set_menu_order( 999999 );
     }
     $product->set_name( $productObject->ItemCodeDesc );
     $product->set_sku( $productObject->ItemCode );
@@ -227,6 +255,8 @@ function sage_roi_variant_product( $productObject ) {
     $product_id = wc_get_product_id_by_sku( $productObject->ItemCode );
     if($product_id) {
         $product = new WC_Product_Variable( $product_id );
+    } else {
+        $product->set_menu_order( 999999 );
     }
     $product->set_name( $productObject->ItemCodeDesc );
     $product->set_sku( $productObject->ItemCode );
@@ -404,6 +434,29 @@ function sage_roi_save_product_sage($post_id){
     
 }
 
+add_action( 'woocommerce_new_product', 'sage_roi_new_product_menu_order_last', 10, 2 );
+function sage_roi_new_product_menu_order_last( $product_id, $product ) {
+    if ( $product && is_a( $product, 'WC_Product' ) ) {
+        $product->set_menu_order( 999999 );
+        $product->save();
+    }
+}
+
+add_action( 'transition_post_status', 'sage_roi_new_product_menu_order_on_publish', 10, 3 );
+function sage_roi_new_product_menu_order_on_publish( $new_status, $old_status, $post ) {
+    if ( 'product' !== $post->post_type || 'publish' !== $new_status ) {
+        return;
+    }
+    if ( in_array( $old_status, array( 'publish', 'trash', 'private' ), true ) ) {
+        return;
+    }
+    wp_update_post( array(
+        'ID'         => $post->ID,
+        'menu_order' => 999999,
+    ) );
+}
+
+
 
 function sage_roi_set_product_ids( $itemCodes = array() ) {
 
@@ -465,3 +518,11 @@ function sage_roi_set_product_ids( $itemCodes = array() ) {
 add_filter( 'woocommerce_payment_complete_reduce_order_stock', '__return_false' );
 
 add_action( 'woocommerce_reduce_order_stock', 'sage_roi_reduce_order_stock', 10, 2 );
+
+
+add_filter('woocommerce_get_catalog_ordering_args', 'sage_roi_custom_woocommerce_menu_order');
+function sage_roi_custom_woocommerce_menu_order($args) {
+    $args['orderby'] = 'menu_order title';
+    $args['order'] = 'ASC';
+    return $args;
+}
