@@ -151,23 +151,81 @@ function sage_roi_single_product_variation_change_script() {
 
 
 
-function sage_roi_custom_pre_get_posts_query( $q ) { 
-  $userId = get_current_user_id();
-  $customer = new WC_Customer( $userId );
-  if( is_object( $customer )) {
-    $args = array(
-      'relation' => 'or',
-      array(
-        'key'     => sage_roi_option_key('hide_from_customers'),
-        'compare' => "NOT EXISTS"
-      ),
-      array(
-        'key'     => sage_roi_option_key('hide_from_customers'),
-        'value' => '"('. implode('|', array( $userId )) .')"',
-        'compare' => 'NOT REGEXP'
-      ),
+function sage_roi_custom_pre_get_posts_query( $q ) {
+    $userId = get_current_user_id();
+    if ( ! $userId ) {
+        return;
+    }
+
+    $meta_query = array( 'relation' => 'AND' );
+
+    // hide_from_customers (Sage ROI tab)
+    $meta_query[] = array(
+        'relation' => 'OR',
+        array(
+            'key'     => sage_roi_option_key( 'hide_from_customers' ),
+            'compare' => 'NOT EXISTS',
+        ),
+        array(
+            'key'     => sage_roi_option_key( 'hide_from_customers' ),
+            'value'   => ';i:' . (int) $userId . '[;}]',
+            'compare' => 'NOT REGEXP',
+        ),
     );
-    $q->set( 'meta_query', $args );
-  }
+
+    // hide_from_users (Show Item to User tab)
+    $meta_query[] = array(
+        'relation' => 'OR',
+        array(
+            'key'     => sage_roi_option_key( 'hide_from_users' ),
+            'compare' => 'NOT EXISTS',
+        ),
+        array(
+            'key'     => sage_roi_option_key( 'hide_from_users' ),
+            'value'   => ';i:' . (int) $userId . '[;}]',
+            'compare' => 'NOT REGEXP',
+        ),
+    );
+
+    // show_only_to_users (Show Item to User tab) - if set, product visible only to listed users
+    $meta_query[] = array(
+        'relation' => 'OR',
+        array(
+            'key'     => sage_roi_option_key( 'show_only_to_users' ),
+            'compare' => 'NOT EXISTS',
+        ),
+        array(
+            'key'     => sage_roi_option_key( 'show_only_to_users' ),
+            'value'   => ';i:' . (int) $userId . '[;}]',
+            'compare' => 'REGEXP',
+        ),
+    );
+
+    $q->set( 'meta_query', $meta_query );
 }
 add_action( 'woocommerce_product_query', 'sage_roi_custom_pre_get_posts_query' );
+
+// Single product page: hide product if user lacks access
+add_filter( 'woocommerce_product_is_visible', 'sage_roi_product_visibility_by_user', 10, 2 );
+function sage_roi_product_visibility_by_user( $visible, $product_id ) {
+    $userId = get_current_user_id();
+    if ( ! $userId ) {
+        return $visible;
+    }
+
+    $hide_from = get_post_meta( $product_id, sage_roi_option_key( 'hide_from_users' ), true );
+    $hide_customers = get_post_meta( $product_id, sage_roi_option_key( 'hide_from_customers' ), true );
+    $show_only = get_post_meta( $product_id, sage_roi_option_key( 'show_only_to_users' ), true );
+
+    if ( is_array( $hide_from ) && in_array( $userId, array_map( 'intval', $hide_from ), true ) ) {
+        return false;
+    }
+    if ( is_array( $hide_customers ) && in_array( $userId, array_map( 'intval', $hide_customers ), true ) ) {
+        return false;
+    }
+    if ( is_array( $show_only ) && ! empty( $show_only ) && ! in_array( $userId, array_map( 'intval', $show_only ), true ) ) {
+        return false;
+    }
+
+    return $visible;
+}
