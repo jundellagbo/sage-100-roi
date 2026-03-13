@@ -355,6 +355,7 @@ function sage_roi_submit_order_to_api( $orderId ) {
     # submit order to api.
     sage_roi_token_validate();
     $submitOrderURL = sage_roi_base_endpoint("/v2/sales_order_headers");
+    $fds = new FSD_Data_Encryption();
     $submitOrderResponse = wp_remote_post($submitOrderURL, array(
         'headers' => array(
             'Content-Type' => 'application/json',
