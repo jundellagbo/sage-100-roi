@@ -62,13 +62,14 @@ add_filter( 'send_email_change_email', 'sage_roi_conditionally_email_notificatio
 add_filter( 'send_password_change_admin_email', 'sage_roi_conditionally_email_notification' );
 
 function sage_roi_set_customer( $customerObject ) {
-    if(!$customerObject->EmailAddress) {
+    $email = sage_roi_get_primary_customer( $customerObject );
+    if ( ! $email ) {
         return false;
     }
 
-    $user = get_user_by( 'email', strtolower( $customerObject->EmailAddress ) );
+    $user = get_user_by( 'email', strtolower( $email ) );
     $userName = strtolower( $customerObject->CustomerName );
-    if($user->ID) {
+    if ( $user && $user->ID ) {
         $customer = new WC_Customer( $user->ID );
     } else {
         $customer = new WC_Customer();
@@ -76,7 +77,7 @@ function sage_roi_set_customer( $customerObject ) {
         $customer->set_password( wp_generate_password() );
     }
     $customer->set_username( $userName );
-    $customer->set_email( strtolower( $customerObject->EmailAddress ) );
+    $customer->set_email( strtolower( $email ) );
     $customer->set_first_name( $customerObject->CustomerName );
     $customer->set_last_name( "-" );
     
@@ -86,7 +87,7 @@ function sage_roi_set_customer( $customerObject ) {
     $customer->set_billing_city( $customerObject->City );
     $customer->set_billing_state( $customerObject->State );
     $customer->set_billing_country( substr( $customerObject->CountryCode, 0, 2 ) );
-    $customer->set_billing_email( strtolower( $customerObject->EmailAddress ) );
+    $customer->set_billing_email( strtolower( $email ) );
     $customer->set_billing_first_name( $customerObject->CustomerName );
     $customer->set_billing_last_name( "-" );
     $customer->set_billing_phone( $customerObject->TelephoneNo );
@@ -260,7 +261,7 @@ function sage_roi_get_customer_in_sage( $email = null ) {
             'Content-Type'  => 'application/json',
             'Authorization' => 'Bearer ' . $fds->decrypt(sage_roi_get_option('access_token'))
         ),
-        'body' => '"x => x.EmailAddress == \"' . $email . '\""'
+        'body' => '"x => x.EmailAddress.Contains(\"' . $email . '\")"'
     ));
 
     if ( is_wp_error( $customerResponse ) ) {
@@ -291,6 +292,17 @@ function sage_roi_get_customer_in_sage( $email = null ) {
     set_transient( $cache_key, $fetchedCustomer, DAY_IN_SECONDS );
 
     return $fetchedCustomer;
+}
+
+
+function sage_roi_get_primary_customer( $customerObject ) {
+    if(!$customerObject->EmailAddress) {
+        return false;
+    }
+    $email = $customerObject->EmailAddress;
+    $emails = preg_split('/[;,]+/', $email);
+    $first_email = trim($emails[0]);
+    return $first_email;
 }
 
 
