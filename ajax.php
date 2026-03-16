@@ -21,18 +21,19 @@ add_action( 'wp_ajax_sage_roi_customer_search', 'sage_roi_customer_search' );
 function sage_roi_customer_search() {
 
   sage_roi_nonce_get_check();
-  if(!isset( $_GET['term'] )) {
-    echo json_encode([]);
+  if ( ! isset( $_GET['term'] ) || strlen( sanitize_text_field( $_GET['term'] ) ) < 3 ) {
+    echo json_encode( [] );
+    exit;
   }
 
-  $search_term = $_GET['term'];
+  $search_term = sanitize_text_field( $_GET['term'] );
 
-  $args = array();
-
-  $args = array (
+  $args = array(
     'role'       => 'customer',
     'order'      => 'asc',
     'orderby'    => 'display_name',
+    'search'     => '*' . $search_term . '*',
+    'search_columns' => array( 'user_login', 'user_email', 'display_name' ),
     'meta_query' => array(
       'relation' => 'or',
       array(
