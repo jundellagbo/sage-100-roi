@@ -194,6 +194,18 @@ function sage_roi_custom_pre_get_posts_query( $q ) {
             'key'     => sage_roi_option_key( 'show_only_to_users' ),
             'compare' => 'NOT EXISTS',
         ),
+        // The meta key is always written by `sage_roi_meta_upsert()`. When the UI is left empty,
+        // WordPress stores an empty serialized array (e.g. `a:0:{}`), which should NOT restrict visibility.
+        array(
+            'key'     => sage_roi_option_key( 'show_only_to_users' ),
+            'value'   => '',
+            'compare' => '=',
+        ),
+        array(
+            'key'     => sage_roi_option_key( 'show_only_to_users' ),
+            'value'   => 'a:0:{}',
+            'compare' => '=',
+        ),
         array(
             'key'     => sage_roi_option_key( 'show_only_to_users' ),
             'value'   => ';i:' . (int) $userId . '[;}]',
