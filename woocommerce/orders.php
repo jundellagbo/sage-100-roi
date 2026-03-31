@@ -87,6 +87,89 @@ function sage_roi_orders_sync() {
     return $results;
 }
 
+/**
+ * First header from sales_order_history_headers search, or null if none / invalid payload.
+ *
+ * @param mixed $results json_decode() result.
+ * @return object|null
+ */
+function sage_roi_sage_order_search_first_result( $results ) {
+    if ( ! is_object( $results ) || ! isset( $results->Results ) || ! is_array( $results->Results ) ) {
+        return null;
+    }
+    return isset( $results->Results[0] ) && is_object( $results->Results[0] ) ? $results->Results[0] : null;
+}
+
+/**
+ * Customer email from history header (nested Customer) or sales order header submit response (root EmailAddress).
+ *
+ * @param object $orderObject Sage order payload.
+ * @return string Lowercased email or ''.
+ */
+function sage_roi_sage_order_header_get_email( $orderObject ) {
+    if ( isset( $orderObject->Customer ) && is_object( $orderObject->Customer ) && ! empty( $orderObject->Customer->EmailAddress ) ) {
+        return strtolower( str_replace( ',', '.', (string) $orderObject->Customer->EmailAddress ) );
+    }
+    if ( ! empty( $orderObject->EmailAddress ) ) {
+        return strtolower( str_replace( ',', '.', (string) $orderObject->EmailAddress ) );
+    }
+    return '';
+}
+
+/**
+ * Line collection: history uses SalesOrderHistoryDetails; order submission uses SalesOrderDetails.
+ *
+ * @param object $orderObject Sage order payload.
+ * @return array<int, object>
+ */
+function sage_roi_sage_order_header_detail_lines( $orderObject ) {
+    if ( isset( $orderObject->SalesOrderHistoryDetails ) && is_array( $orderObject->SalesOrderHistoryDetails ) ) {
+        return $orderObject->SalesOrderHistoryDetails;
+    }
+    if ( isset( $orderObject->SalesOrderDetails ) && is_array( $orderObject->SalesOrderDetails ) ) {
+        return $orderObject->SalesOrderDetails;
+    }
+    return array();
+}
+
+/**
+ * @param object $line Detail line from either API shape.
+ * @return string Item code or ''.
+ */
+function sage_roi_sage_order_line_item_code( $line ) {
+    if ( ! is_object( $line ) ) {
+        return '';
+    }
+    if ( isset( $line->Item ) && is_object( $line->Item ) && isset( $line->Item->ItemCode ) ) {
+        return (string) $line->Item->ItemCode;
+    }
+    if ( isset( $line->ItemCode ) ) {
+        return (string) $line->ItemCode;
+    }
+    return '';
+}
+
+/**
+ * @param object $line Detail line from either API shape.
+ * @return float|int Quantity to use for Woo line items.
+ */
+function sage_roi_sage_order_line_quantity( $line ) {
+    if ( ! is_object( $line ) ) {
+        return 0;
+    }
+    if ( isset( $line->QuantityOrderedOriginal ) ) {
+        $q = $line->QuantityOrderedOriginal;
+        if ( isset( $line->QuantityOrderedRevised ) && $line->QuantityOrderedOriginal !== $line->QuantityOrderedRevised ) {
+            $q = $line->QuantityOrderedRevised;
+        }
+        return $q;
+    }
+    if ( isset( $line->QuantityOrdered ) ) {
+        return $line->QuantityOrdered;
+    }
+    return 0;
+}
+
 
 
 function sage_roi_refetch_order( $orderId ) {
@@ -108,12 +191,15 @@ function sage_roi_refetch_order( $orderId ) {
      $results = json_decode($response['body']);
 
      $acknowledgeOrders = array();
-     sage_roi_set_customer_order( $results->Results[0] );
-     if( !$results->Results[0]->IsProcessed ) {
-        $acknowledgeOrders[] = array(
-            'SalesOrderNo' => $results->Results[0]->SalesOrderNo,
-            'CompanyCode' => $results->Results[0]->CompanyCode ?? ''
-        );
+     $first = sage_roi_sage_order_search_first_result( $results );
+     if ( $first ) {
+        sage_roi_set_customer_order( $first );
+        if ( isset( $first->IsProcessed ) && ! $first->IsProcessed ) {
+            $acknowledgeOrders[] = array(
+                'SalesOrderNo' => $first->SalesOrderNo,
+                'CompanyCode' => $first->CompanyCode ?? '',
+            );
+        }
      }
 
     if( count( $acknowledgeOrders ) ) {
@@ -124,23 +210,43 @@ function sage_roi_refetch_order( $orderId ) {
 }
 
 
-function sage_roi_set_customer_order( $orderObject ) {
+function sage_roi_set_customer_order( $orderObject, $wc_order_id = null ) {
 
-    $orderPostIds = wc_get_orders( array(
-        'meta_key' => sage_roi_option_key("SalesOrderNo"),
-        'meta_value' => $orderObject->SalesOrderNo,
-        'meta_compare'  => '=',
-        'return'        => 'ids'
-    ));
-
-    $orderId = count($orderPostIds) ? $orderPostIds[0] : null;
-    $order = new WC_Order();
-    if(!empty( $orderId )) {
-        $order = new WC_Order( $orderId );
+    if ( ! is_object( $orderObject ) ) {
+        return false;
     }
 
-    $user = get_user_by( 'email', strtolower( $orderObject->Customer->EmailAddress ) );
-    if(!$user) { return false; }
+    $order = null;
+    if ( ! empty( $wc_order_id ) ) {
+        $order = wc_get_order( (int) $wc_order_id );
+    }
+    if ( ! $order ) {
+        $so_no = isset( $orderObject->SalesOrderNo ) ? $orderObject->SalesOrderNo : '';
+        $orderPostIds = wc_get_orders( array(
+            'meta_key' => sage_roi_option_key( 'SalesOrderNo' ),
+            'meta_value' => $so_no,
+            'meta_compare'  => '=',
+            'return'        => 'ids',
+        ) );
+
+        $resolved_id = count( $orderPostIds ) ? $orderPostIds[0] : null;
+        if ( ! empty( $resolved_id ) ) {
+            $order = wc_get_order( $resolved_id );
+        }
+    }
+
+    if ( ! $order || ! $order->get_id() ) {
+        return false;
+    }
+
+    $email = sage_roi_sage_order_header_get_email( $orderObject );
+    if ( '' === $email && $order->get_billing_email() ) {
+        $email = strtolower( $order->get_billing_email() );
+    }
+    $user = $email ? get_user_by( 'email', $email ) : false;
+    if ( ! $user ) {
+        return false;
+    }
     $order->set_customer_id( $user->ID );
     $order->set_created_via( 'admin' );
 
@@ -150,13 +256,14 @@ function sage_roi_set_customer_order( $orderObject ) {
         $existingProductIds[] = $item->get_product_id();
     }
 
-    foreach( $orderObject->SalesOrderHistoryDetails as $orderItems ) {
-        $product_id = wc_get_product_id_by_sku( $orderItems->Item->ItemCode );
-        $quantity = $orderItems->QuantityOrderedOriginal;
-        if($orderItems->QuantityOrderedOriginal !== $orderItems->QuantityOrderedRevised) {
-            $quantity = $orderItems->QuantityOrderedRevised;
+    foreach ( sage_roi_sage_order_header_detail_lines( $orderObject ) as $orderItems ) {
+        $item_code = sage_roi_sage_order_line_item_code( $orderItems );
+        if ( '' === $item_code ) {
+            continue;
         }
-        if($product_id && !in_array($product_id, $existingProductIds)) {
+        $product_id = wc_get_product_id_by_sku( $item_code );
+        $quantity   = sage_roi_sage_order_line_quantity( $orderItems );
+        if ( $product_id && ! in_array( $product_id, $existingProductIds, true ) ) {
             $order->add_product( wc_get_product( $product_id ), $quantity );
         }
     }
@@ -189,13 +296,20 @@ function sage_roi_set_customer_order( $orderObject ) {
     $order->set_address( $shipping_address, 'shipping' );
     $order->set_address( $billing_address, 'billing' );
 
-    $order->set_payment_method( strtolower($orderObject->PaymentType) );
-    $order->set_payment_method_title( $orderObject->PaymentType );
+    $payment_type = isset( $orderObject->PaymentType ) ? (string) $orderObject->PaymentType : '';
+    if ( $payment_type !== '' ) {
+        $order->set_payment_method( strtolower( $payment_type ) );
+        $order->set_payment_method_title( $payment_type );
+    }
 
     $order->set_status( 'wc-completed', 'Order is created programmatically from SAGE 100' );
 
-    $order->set_discount_total( $orderObject->DiscountAmt );
-    $order->set_total( $orderObject->NonTaxableAmt );
+    if ( isset( $orderObject->DiscountAmt ) && null !== $orderObject->DiscountAmt && '' !== $orderObject->DiscountAmt ) {
+        $order->set_discount_total( (float) $orderObject->DiscountAmt );
+    }
+    if ( isset( $orderObject->NonTaxableAmt ) && null !== $orderObject->NonTaxableAmt && '' !== $orderObject->NonTaxableAmt ) {
+        $order->set_total( (float) $orderObject->NonTaxableAmt );
+    }
 
     $order->set_date_created( sage_roi_api_date( $orderObject->OrderDate ) );
     $order->set_date_paid( sage_roi_api_date( $orderObject->OrderDate ) );
@@ -209,13 +323,16 @@ function sage_roi_set_customer_order( $orderObject ) {
     add_filter('woocommerce_new_order_email_allows_resend', '__return_false' );
 
     // update order item metas
-    foreach( $order->get_items() as $item_id => $item ) {
+    foreach ( $order->get_items() as $item_id => $item ) {
         $productIdForMeta = $item->get_product_id();
-        $productForMeta = wc_get_product($productIdForMeta);
-        foreach( $orderObject->SalesOrderHistoryDetails as $oitems ) {
-            $pSku = $productForMeta->get_sku();
-            if($oitems->Item->ItemCode === $pSku) {
-                wc_update_order_item_meta($item_id, sage_roi_option_key('order_item_json'), json_encode($oitems));
+        $productForMeta   = wc_get_product( $productIdForMeta );
+        if ( ! $productForMeta ) {
+            continue;
+        }
+        $pSku = $productForMeta->get_sku();
+        foreach ( sage_roi_sage_order_header_detail_lines( $orderObject ) as $oitems ) {
+            if ( sage_roi_sage_order_line_item_code( $oitems ) === $pSku ) {
+                wc_update_order_item_meta( $item_id, sage_roi_option_key( 'order_item_json' ), wp_json_encode( $oitems ) );
             }
         }
     }
@@ -254,10 +371,19 @@ function sage_roi_submit_order_to_api( $orderId ) {
     $customer = new WC_Customer( $customerId );
 
 
-    // order params preparation
+    // order params preparation — OrderDate + final date meta: single resolver (see sage_roi_order_date_get_sage_submit_order_date).
+    $sage_submit_dates = function_exists( 'sage_roi_order_date_get_sage_submit_order_date' )
+        ? sage_roi_order_date_get_sage_submit_order_date( $order )
+        : array( 'order_date_ymd' => '', 'final_ymd' => '', 'delivery_ymd' => '' );
+    $final_order_date_ymd = isset( $sage_submit_dates['order_date_ymd'] ) ? $sage_submit_dates['order_date_ymd'] : '';
+    if ( $final_order_date_ymd === '' ) {
+        $ts = $order->get_date_created() ? $order->get_date_created()->getTimestamp() : time();
+        $final_order_date_ymd = date( 'Ymd', $ts );
+    }
+
     $args = array(
         "SalesOrderNo" => $orderId,
-        "OrderDate" => date('Ymd', strtotime($order->order_date)),
+        "OrderDate" => $final_order_date_ymd,
         "OrderType" => "C",
         "DateTimeProcessed" => $order->order_date,
         "DateCreatedUtc" => $order->order_date,
@@ -368,13 +494,17 @@ function sage_roi_submit_order_to_api( $orderId ) {
         return $submitOrderResponse->get_error_message();
      }
 
-     $submitOrderResponseResults = json_decode($submitOrderResponse['body']);
+     $submitOrderResponseResults = json_decode( $submitOrderResponse['body'] );
 
-     $order->update_meta_data( sage_roi_option_key( 'SalesOrderNo' ), $orderId );
+     $sage_sales_no = ( is_object( $submitOrderResponseResults ) && ! empty( $submitOrderResponseResults->SalesOrderNo ) )
+        ? $submitOrderResponseResults->SalesOrderNo
+        : $orderId;
+     $order->update_meta_data( sage_roi_option_key( 'SalesOrderNo' ), $sage_sales_no );
+     $order->update_meta_data( sage_roi_option_key( 'sage_final_order_date' ), isset( $sage_submit_dates['final_ymd'] ) ? $sage_submit_dates['final_ymd'] : '' );
 
-     $order->update_meta_data( sage_roi_option_key( 'submitted_order_json' ), json_encode( $submitOrderResponseResults ) );
+     $order->update_meta_data( sage_roi_option_key( 'submitted_order_json' ), wp_json_encode( $submitOrderResponseResults ) );
 
-     $order->update_meta_data( sage_roi_option_key( 'submitted_order_payload_json' ), json_encode( $args ) );
+     $order->update_meta_data( sage_roi_option_key( 'submitted_order_payload_json' ), wp_json_encode( $args ) );
 
      $order->update_meta_data( sage_roi_option_key( 'thankyou_action_done' ), true );
 
@@ -384,8 +514,11 @@ function sage_roi_submit_order_to_api( $orderId ) {
     # resync items after order for stock management
     sage_roi_set_product_ids( $itemCodes );
 
-    # refetch updated order from SAGE to System
-    sage_roi_refetch_order( $orderId );
+    # Sync Woo order from Sage history when available; otherwise use submission response (history may lag or use a different key).
+    $history_search = sage_roi_refetch_order( $orderId );
+    if ( ! sage_roi_sage_order_search_first_result( $history_search ) && is_object( $submitOrderResponseResults ) ) {
+        sage_roi_set_customer_order( $submitOrderResponseResults, $orderId );
+    }
 
     return $submitOrderResponseResults;
 }
