@@ -11,6 +11,7 @@
  * - Elementor Pro Cart widget: inject before .wc-proceed-to-checkout when the WC hook does not run
  * - WooCommerce Cart block: same UI via assets/cart-delivery.js + AJAX (above Proceed to checkout)
  * - Block checkout: additional checkout field + assets/checkout-block-notice.js (notice under select in order fields)
+ * - Delivery labels use {@see sage_roi_order_date_format_delivery_display_label} (e.g. April 17, 2026 - Friday).
  */
 
 if ( ! function_exists( 'sage_roi_option_key' ) ) {
@@ -24,9 +25,204 @@ define( 'SAGE_ROI_ORDER_DATE_CUTOFF_HOUR_OPTION', 'sage_roi_order_date_cutoff_ho
 define( 'SAGE_ROI_ORDER_DATE_BUSINESS_DAYS_OPTION', 'sage_roi_order_date_business_days_before' );
 define( 'SAGE_ROI_ORDER_DATE_BUSINESS_WEEKDAYS_OPTION', 'sage_roi_order_date_business_weekdays' );
 define( 'SAGE_ROI_ORDER_DATE_CART_NOTICE_OPTION', 'sage_roi_order_date_cart_notice_template' );
+define( 'SAGE_ROI_ORDER_DATE_REPEAT_WEEKS_OPTION', 'sage_roi_order_date_repeat_weeks' );
+define( 'SAGE_ROI_ORDER_DATE_REPEAT_MONTHS_OPTION', 'sage_roi_order_date_repeat_months' );
+define( 'SAGE_ROI_ORDER_DATE_REPEAT_YEARS_OPTION', 'sage_roi_order_date_repeat_years' );
 define( 'SAGE_ROI_ORDER_DATE_FIELD_ID', 'sage-100-roi/order-date' );
 
 // --- Shared helpers (no secrets in defaults; customize under Order Dates > Settings) ---
+
+/**
+ * English ordinal for day-of-month (1st, 2nd, 3rd, …).
+ *
+ * @param int $day 1–31.
+ */
+function sage_roi_order_date_day_ordinal_en( $day ) {
+    $day = (int) $day;
+    if ( $day < 1 || $day > 31 ) {
+        return (string) $day;
+    }
+    $suffix = 'th';
+    $mod100 = $day % 100;
+    if ( $mod100 < 11 || $mod100 > 13 ) {
+        switch ( $day % 10 ) {
+            case 1:
+                $suffix = 'st';
+                break;
+            case 2:
+                $suffix = 'nd';
+                break;
+            case 3:
+                $suffix = 'rd';
+                break;
+        }
+    }
+    return $day . $suffix;
+}
+
+/**
+ * @return int >= 0
+ */
+function sage_roi_order_date_get_repeat_weeks_count() {
+    $w = (int) get_option( SAGE_ROI_ORDER_DATE_REPEAT_WEEKS_OPTION, 4 );
+    return max( 0, $w );
+}
+
+/**
+ * @return int >= 0
+ */
+function sage_roi_order_date_get_repeat_months_count() {
+    $m = (int) get_option( SAGE_ROI_ORDER_DATE_REPEAT_MONTHS_OPTION, 1 );
+    return max( 0, $m );
+}
+
+/**
+ * @return int >= 0
+ */
+function sage_roi_order_date_get_repeat_years_count() {
+    $y = (int) get_option( SAGE_ROI_ORDER_DATE_REPEAT_YEARS_OPTION, 1 );
+    return max( 0, $y );
+}
+
+/**
+ * Parse Y-m-d in the site timezone, normalized to midnight.
+ *
+ * @param string $ymd Y-m-d.
+ * @return DateTime|null
+ */
+function sage_roi_order_date_parse_ymd( $ymd ) {
+    $dt = DateTime::createFromFormat( 'Y-m-d', (string) $ymd, wp_timezone() );
+    if ( ! $dt ) {
+        return null;
+    }
+    $dt->setTime( 0, 0, 0 );
+    return $dt;
+}
+
+/**
+ * Human-readable repeat option labels for a Y-m-d anchor (admin UI).
+ *
+ * @param string $ymd Y-m-d.
+ * @return array{monthly:string,weekly:string,yearly:string}|null
+ */
+function sage_roi_order_date_repeat_labels_for_ymd( $ymd ) {
+    $dt = sage_roi_order_date_parse_ymd( $ymd );
+    if ( ! $dt ) {
+        return null;
+    }
+    $ts     = $dt->getTimestamp();
+    $day    = (int) $dt->format( 'j' );
+    $wd     = date_i18n( 'l', $ts );
+    $annual = date_i18n( 'F j', $ts );
+    return array(
+        'monthly' => sprintf(
+            /* translators: %s: ordinal day of month, e.g. "2nd". */
+            __( 'Repeat every %s of each month', 'sage-100-roi' ),
+            sage_roi_order_date_day_ordinal_en( $day )
+        ),
+        /* translators: %s: weekday name. */
+        'weekly'  => sprintf( __( 'Repeat every %s', 'sage-100-roi' ), $wd ),
+        /* translators: %s: calendar month and day, e.g. "April 2". */
+        'yearly'  => sprintf( __( 'Repeat annually on %s', 'sage-100-roi' ), $annual ),
+    );
+}
+
+/**
+ * @param string   $anchor_ymd Y-m-d.
+ * @param int      $extra_months Number of additional months after anchor (total months = 1 + extra).
+ * @return string[] Y-m-d.
+ */
+function sage_roi_order_date_expand_monthly_occurrences( $anchor_ymd, $extra_months ) {
+    $dt = sage_roi_order_date_parse_ymd( $anchor_ymd );
+    if ( ! $dt ) {
+        return array();
+    }
+    $dom = (int) $dt->format( 'j' );
+    $out = array();
+    $extra_months = max( 0, (int) $extra_months );
+    for ( $k = 0; $k <= $extra_months; $k++ ) {
+        $c = clone $dt;
+        if ( $k > 0 ) {
+            $c->modify( '+' . $k . ' months' );
+        }
+        $y    = (int) $c->format( 'Y' );
+        $m    = (int) $c->format( 'n' );
+        $last = (int) $c->format( 't' );
+        $use  = min( $dom, $last );
+        $c->setDate( $y, $m, $use );
+        $out[] = $c->format( 'Y-m-d' );
+    }
+    return $out;
+}
+
+/**
+ * @param string $anchor_ymd Y-m-d.
+ * @param int    $extra_weeks Number of additional weeks after anchor (total = 1 + extra).
+ * @return string[]
+ */
+function sage_roi_order_date_expand_weekly_occurrences( $anchor_ymd, $extra_weeks ) {
+    $dt = sage_roi_order_date_parse_ymd( $anchor_ymd );
+    if ( ! $dt ) {
+        return array();
+    }
+    $out          = array();
+    $extra_weeks = max( 0, (int) $extra_weeks );
+    for ( $k = 0; $k <= $extra_weeks; $k++ ) {
+        $c = clone $dt;
+        if ( $k > 0 ) {
+            $c->modify( '+' . ( $k * 7 ) . ' days' );
+        }
+        $out[] = $c->format( 'Y-m-d' );
+    }
+    return $out;
+}
+
+/**
+ * @param string $anchor_ymd Y-m-d.
+ * @param int    $extra_years Number of additional years after anchor (total = 1 + extra).
+ * @return string[]
+ */
+function sage_roi_order_date_expand_yearly_occurrences( $anchor_ymd, $extra_years ) {
+    $dt = sage_roi_order_date_parse_ymd( $anchor_ymd );
+    if ( ! $dt ) {
+        return array();
+    }
+    $out          = array();
+    $extra_years = max( 0, (int) $extra_years );
+    for ( $k = 0; $k <= $extra_years; $k++ ) {
+        $c = clone $dt;
+        if ( $k > 0 ) {
+            $c->modify( '+' . $k . ' years' );
+        }
+        $out[] = $c->format( 'Y-m-d' );
+    }
+    return $out;
+}
+
+/**
+ * @param string   $ymd          Candidate Y-m-d.
+ * @param string[] $holidays_md  m-d holiday keys.
+ * @param DateTime $now          Current time (timezone-aware).
+ * @param int      $cutoff_hour  0–23.
+ * @return bool
+ */
+function sage_roi_order_date_is_candidate_eligible( $ymd, array $holidays_md, DateTime $now, $cutoff_hour ) {
+    $dt = sage_roi_order_date_parse_ymd( $ymd );
+    if ( ! $dt ) {
+        return false;
+    }
+    $md = $dt->format( 'm-d' );
+    if ( in_array( $md, $holidays_md, true ) ) {
+        return false;
+    }
+    if ( ! sage_roi_order_date_is_date_selectable( $dt, $now, $cutoff_hour ) ) {
+        return false;
+    }
+    if ( ! sage_roi_order_date_is_weekday_open( $dt ) ) {
+        return false;
+    }
+    return true;
+}
 
 function sage_roi_order_date_default_cart_notice_template() {
     return __( 'This order will be scheduled for delivery on {delivery_date}. You can choose another available date using the menu above.', 'sage-100-roi' );
@@ -80,9 +276,23 @@ function sage_roi_order_date_is_weekday_open( DateTime $dt ) {
     return in_array( $n, sage_roi_order_date_get_business_weekdays(), true );
 }
 
-function sage_roi_order_date_format_notice_short_date( $ymd ) {
-    $dt = DateTime::createFromFormat( 'Y-m-d', (string) $ymd );
-    return $dt ? $dt->format( 'n/j/y' ) : (string) $ymd;
+/**
+ * Cart/checkout delivery date display: "April 17, 2026 - Friday" (localized month and weekday).
+ *
+ * @param string $ymd Y-m-d.
+ */
+function sage_roi_order_date_format_delivery_display_label( $ymd ) {
+    $dt = sage_roi_order_date_parse_ymd( $ymd );
+    if ( ! $dt ) {
+        return (string) $ymd;
+    }
+    $ts = $dt->getTimestamp();
+    return sprintf(
+        /* translators: 1: date like April 17, 2026, 2: weekday name (e.g. Friday). */
+        __( '%1$s - %2$s', 'sage-100-roi' ),
+        date_i18n( 'F j, Y', $ts ),
+        date_i18n( 'l', $ts )
+    );
 }
 
 function sage_roi_order_date_sort_dates_asc( array $dates ) {
@@ -101,13 +311,11 @@ function sage_roi_order_date_earliest_in_list( array $dates ) {
  * @return array<int,array{value:string,label:string}>
  */
 function sage_roi_order_date_select_options_for_dates( array $dates ) {
-    $fmt = get_option( 'date_format' );
     $out = array();
     foreach ( sage_roi_order_date_sort_dates_asc( $dates ) as $d ) {
-        $dt = DateTime::createFromFormat( 'Y-m-d', $d );
         $out[] = array(
             'value' => $d,
-            'label' => $dt ? $dt->format( $fmt ) : $d,
+            'label' => sage_roi_order_date_format_delivery_display_label( $d ),
         );
     }
     return $out;
@@ -232,7 +440,7 @@ function sage_roi_order_date_admin_column_content( $column, $post_id ) {
         }
         $labels = array();
         foreach ( $dates as $d ) {
-            $dt       = DateTime::createFromFormat( 'Y-m-d', $d );
+            $dt       = sage_roi_order_date_parse_ymd( $d );
             $labels[] = $dt ? $dt->format( 'm/d/Y' ) : $d;
         }
         echo esc_html( implode( ', ', $labels ) );
@@ -291,6 +499,50 @@ function sage_roi_order_date_meta_boxes() {
     );
 }
 
+/**
+ * @param int|string $index Row index for POST keys, or the literal "__INDEX__" for the JS row template.
+ * @param array      $entry Keys: date, repeat_monthly, repeat_weekly, repeat_yearly.
+ */
+function sage_roi_order_date_dates_meta_box_row_html( $index, array $entry ) {
+    $date = isset( $entry['date'] ) ? (string) $entry['date'] : '';
+    $rm   = ! empty( $entry['repeat_monthly'] );
+    $rw   = ! empty( $entry['repeat_weekly'] );
+    $ry   = ! empty( $entry['repeat_yearly'] );
+    $labels = ( $date !== '' ) ? sage_roi_order_date_repeat_labels_for_ymd( $date ) : null;
+    $show   = ( $date !== '' && $labels );
+    // Do not cast '__INDEX__' to int — (int) '__INDEX__' is 0 and would break the clone template (duplicate [0] keys).
+    $idx    = ( '__INDEX__' === $index ) ? '__INDEX__' : (string) (int) $index;
+    ?>
+    <div class="sage-roi-date-row" data-row-index="<?php echo esc_attr( (string) $idx ); ?>">
+        <p>
+            <input type="date" name="sage_roi_order_date_dates[<?php echo esc_attr( (string) $idx ); ?>][date]" value="<?php echo esc_attr( $date ); ?>" class="sage-roi-date-input" />
+            <button type="button" class="button sage-roi-remove-date"><?php esc_html_e( 'Remove', 'sage-100-roi' ); ?></button>
+        </p>
+        <fieldset class="sage-roi-date-repeat-fieldset" style="<?php echo $show ? '' : 'display:none;'; ?> margin: 0 0 12px 0; padding: 8px 12px; border: 1px solid #c3c4c7;">
+            <legend class="screen-reader-text"><?php esc_html_e( 'Repeat options', 'sage-100-roi' ); ?></legend>
+            <p class="sage-roi-repeat-line sage-roi-repeat-monthly-wrap" style="margin: 4px 0;">
+                <label>
+                    <input type="checkbox" name="sage_roi_order_date_dates[<?php echo esc_attr( (string) $idx ); ?>][repeat_monthly]" value="1" <?php checked( $rm ); ?> class="sage-roi-repeat-monthly-cb" />
+                    <span class="sage-roi-repeat-label-monthly"><?php echo $labels ? esc_html( $labels['monthly'] ) : ''; ?></span>
+                </label>
+            </p>
+            <p class="sage-roi-repeat-line sage-roi-repeat-weekly-wrap" style="margin: 4px 0;">
+                <label>
+                    <input type="checkbox" name="sage_roi_order_date_dates[<?php echo esc_attr( (string) $idx ); ?>][repeat_weekly]" value="1" <?php checked( $rw ); ?> class="sage-roi-repeat-weekly-cb" />
+                    <span class="sage-roi-repeat-label-weekly"><?php echo $labels ? esc_html( $labels['weekly'] ) : ''; ?></span>
+                </label>
+            </p>
+            <p class="sage-roi-repeat-line sage-roi-repeat-yearly-wrap" style="margin: 4px 0;">
+                <label>
+                    <input type="checkbox" name="sage_roi_order_date_dates[<?php echo esc_attr( (string) $idx ); ?>][repeat_yearly]" value="1" <?php checked( $ry ); ?> class="sage-roi-repeat-yearly-cb" />
+                    <span class="sage-roi-repeat-label-yearly"><?php echo $labels ? esc_html( $labels['yearly'] ) : ''; ?></span>
+                </label>
+            </p>
+        </fieldset>
+    </div>
+    <?php
+}
+
 function sage_roi_order_date_dates_meta_box( $post ) {
     $items = get_post_meta( $post->ID, 'sage_roi_order_date_dates', true );
     if ( ! is_array( $items ) ) {
@@ -299,33 +551,40 @@ function sage_roi_order_date_dates_meta_box( $post ) {
     $entries = array();
     foreach ( $items as $item ) {
         if ( is_array( $item ) && isset( $item['date'] ) ) {
-            $entries[] = array( 'date' => $item['date'] );
+            $entries[] = array(
+                'date'            => (string) $item['date'],
+                'repeat_monthly'  => ! empty( $item['repeat_monthly'] ),
+                'repeat_weekly'   => ! empty( $item['repeat_weekly'] ),
+                'repeat_yearly'   => ! empty( $item['repeat_yearly'] ),
+            );
         } elseif ( is_string( $item ) ) {
-            $entries[] = array( 'date' => $item );
+            $entries[] = array(
+                'date'            => $item,
+                'repeat_monthly'  => false,
+                'repeat_weekly'   => false,
+                'repeat_yearly'   => false,
+            );
         }
     }
     $holidays_md = sage_roi_order_date_get_holidays_md();
     wp_nonce_field( 'sage_roi_order_date_save', 'sage_roi_order_date_nonce' );
     $open_wd = sage_roi_order_date_get_business_weekdays();
+    $row_count = count( $entries );
     ?>
-    <p class="description"><?php esc_html_e( 'Add specific dates for this configuration. Monthly repeat is managed in Order Dates > Settings.', 'sage-100-roi' ); ?></p>
+    <p class="description"><?php esc_html_e( 'Add specific dates for this configuration. Optional repeats use counts from Order Dates > Settings.', 'sage-100-roi' ); ?></p>
     <p class="description"><?php esc_html_e( 'Dates matching global holidays are disabled.', 'sage-100-roi' ); ?></p>
     <input type="hidden" id="sage-roi-holidays-md" value="<?php echo esc_attr( wp_json_encode( $holidays_md ) ); ?>" />
     <input type="hidden" id="sage-roi-open-weekdays" value="<?php echo esc_attr( wp_json_encode( $open_wd ) ); ?>" />
-    <div id="sage-roi-order-dates-list">
-        <?php foreach ( $entries as $e ) : ?>
-            <p class="sage-roi-date-row">
-                <input type="date" name="sage_roi_order_date_dates[][date]" value="<?php echo esc_attr( $e['date'] ); ?>" />
-                <button type="button" class="button sage-roi-remove-date"><?php esc_html_e( 'Remove', 'sage-100-roi' ); ?></button>
-            </p>
-        <?php endforeach; ?>
+    <div id="sage-roi-order-dates-list" data-next-index="<?php echo esc_attr( (string) $row_count ); ?>">
+        <?php
+        foreach ( $entries as $i => $e ) {
+            sage_roi_order_date_dates_meta_box_row_html( $i, $e );
+        }
+        ?>
     </div>
     <p><button type="button" class="button sage-roi-add-date"><?php esc_html_e( '+ Add Date', 'sage-100-roi' ); ?></button></p>
     <template id="sage-roi-date-row-tpl">
-        <p class="sage-roi-date-row">
-            <input type="date" name="sage_roi_order_date_dates[][date]" value="" />
-            <button type="button" class="button sage-roi-remove-date"><?php esc_html_e( 'Remove', 'sage-100-roi' ); ?></button>
-        </p>
+        <?php sage_roi_order_date_dates_meta_box_row_html( '__INDEX__', array( 'date' => '', 'repeat_monthly' => false, 'repeat_weekly' => false, 'repeat_yearly' => false ) ); ?>
     </template>
     <?php
 }
@@ -381,6 +640,9 @@ function sage_roi_order_date_settings_page() {
 
     $repeat = get_option( SAGE_ROI_ORDER_DATE_REPEAT_OPTION, array() );
     if ( ! is_array( $repeat ) ) $repeat = array();
+    $repeat_weeks  = sage_roi_order_date_get_repeat_weeks_count();
+    $repeat_months = sage_roi_order_date_get_repeat_months_count();
+    $repeat_years  = sage_roi_order_date_get_repeat_years_count();
     $cutoff_hour = sage_roi_order_date_get_cutoff_hour();
     $business_days = (int) get_option( SAGE_ROI_ORDER_DATE_BUSINESS_DAYS_OPTION, 1 );
     if ( $business_days < 0 ) {
@@ -403,6 +665,12 @@ function sage_roi_order_date_settings_page() {
         $repeat_post = isset( $_POST['sage_roi_order_date_repeat_days'] ) ? array_map( 'absint', (array) $_POST['sage_roi_order_date_repeat_days'] ) : array();
         $repeat_post = array_values( array_filter( $repeat_post, function( $d ) { return $d >= 1 && $d <= 31; } ) );
         update_option( SAGE_ROI_ORDER_DATE_REPEAT_OPTION, $repeat_post );
+        $rw_post = isset( $_POST['sage_roi_order_date_repeat_weeks'] ) ? (int) $_POST['sage_roi_order_date_repeat_weeks'] : 4;
+        $rm_post = isset( $_POST['sage_roi_order_date_repeat_months'] ) ? (int) $_POST['sage_roi_order_date_repeat_months'] : 1;
+        $ry_post = isset( $_POST['sage_roi_order_date_repeat_years'] ) ? (int) $_POST['sage_roi_order_date_repeat_years'] : 1;
+        update_option( SAGE_ROI_ORDER_DATE_REPEAT_WEEKS_OPTION, max( 0, $rw_post ) );
+        update_option( SAGE_ROI_ORDER_DATE_REPEAT_MONTHS_OPTION, max( 0, $rm_post ) );
+        update_option( SAGE_ROI_ORDER_DATE_REPEAT_YEARS_OPTION, max( 0, $ry_post ) );
         $cutoff_post = isset( $_POST['sage_roi_order_date_cutoff_hour'] ) ? (int) $_POST['sage_roi_order_date_cutoff_hour'] : 10;
         if ( $cutoff_post < 0 || $cutoff_post > 23 ) {
             $cutoff_post = 10;
@@ -427,13 +695,16 @@ function sage_roi_order_date_settings_page() {
         $holidays_post = isset( $_POST['sage_roi_order_date_holidays'] ) ? (array) $_POST['sage_roi_order_date_holidays'] : array();
         $holidays_save = array();
         foreach ( array_filter( array_map( 'sanitize_text_field', $holidays_post ) ) as $ymd ) {
-            $d = DateTime::createFromFormat( 'Y-m-d', $ymd );
+            $d = sage_roi_order_date_parse_ymd( $ymd );
             if ( $d ) {
                 $holidays_save[] = $d->format( 'm-d' );
             }
         }
         update_option( SAGE_ROI_ORDER_DATE_HOLIDAYS_OPTION, array_unique( $holidays_save ) );
-        $repeat = $repeat_post;
+        $repeat          = $repeat_post;
+        $repeat_weeks    = max( 0, $rw_post );
+        $repeat_months   = max( 0, $rm_post );
+        $repeat_years    = max( 0, $ry_post );
         $cutoff_hour = $cutoff_post;
         $business_days = $business_days_post;
         $cart_notice_template = $cart_notice_post;
@@ -461,6 +732,27 @@ function sage_roi_order_date_settings_page() {
                                 <label><input type="checkbox" name="sage_roi_order_date_repeat_days[]" value="<?php echo (int) $d; ?>" <?php checked( in_array( (int) $d, $repeat, true ) ); ?> /> <?php echo (int) $d; ?></label>
                             <?php endfor; ?>
                         </div>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( 'Number of weeks for repetitions', 'sage-100-roi' ); ?></th>
+                    <td>
+                        <p class="description"><?php esc_html_e( 'Used when a configured date has “repeat every (weekday)” enabled. Total occurrences are this number plus one (e.g. 4 → five weekly dates including the anchor).', 'sage-100-roi' ); ?></p>
+                        <input type="number" min="0" step="1" name="sage_roi_order_date_repeat_weeks" value="<?php echo (int) $repeat_weeks; ?>" />
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( 'Number of months for repetitions', 'sage-100-roi' ); ?></th>
+                    <td>
+                        <p class="description"><?php esc_html_e( 'Used when a configured date has “repeat every (nth) of each month” enabled. Total months shown are this number plus one (default 1 → two dates).', 'sage-100-roi' ); ?></p>
+                        <input type="number" min="0" step="1" name="sage_roi_order_date_repeat_months" value="<?php echo (int) $repeat_months; ?>" />
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e( 'Number of years for repetitions', 'sage-100-roi' ); ?></th>
+                    <td>
+                        <p class="description"><?php esc_html_e( 'Used when a configured date has “repeat annually” enabled. Total years shown are this number plus one.', 'sage-100-roi' ); ?></p>
+                        <input type="number" min="0" step="1" name="sage_roi_order_date_repeat_years" value="<?php echo (int) $repeat_years; ?>" />
                     </td>
                 </tr>
                 <tr>
@@ -561,19 +853,32 @@ function sage_roi_order_date_save( $post_id, $post ) {
     $holidays_md = sage_roi_order_date_get_holidays_md();
 
     $dates_raw = isset( $_POST['sage_roi_order_date_dates'] ) ? (array) $_POST['sage_roi_order_date_dates'] : array();
+    ksort( $dates_raw, SORT_NUMERIC );
     $dates_save = array();
     foreach ( $dates_raw as $row ) {
+        if ( ! is_array( $row ) ) {
+            continue;
+        }
         $date = isset( $row['date'] ) ? sanitize_text_field( $row['date'] ) : '';
-        if ( empty( $date ) ) continue;
-        $dt = DateTime::createFromFormat( 'Y-m-d', $date );
-        if ( ! $dt ) continue;
+        if ( empty( $date ) ) {
+            continue;
+        }
+        $dt = sage_roi_order_date_parse_ymd( $date );
+        if ( ! $dt ) {
+            continue;
+        }
         if ( in_array( $dt->format( 'm-d' ), $holidays_md, true ) ) {
             continue;
         }
         if ( ! sage_roi_order_date_is_weekday_open( $dt ) ) {
             continue;
         }
-        $dates_save[] = array( 'date' => $date );
+        $dates_save[] = array(
+            'date'           => $date,
+            'repeat_monthly' => ! empty( $row['repeat_monthly'] ),
+            'repeat_weekly'  => ! empty( $row['repeat_weekly'] ),
+            'repeat_yearly'  => ! empty( $row['repeat_yearly'] ),
+        );
     }
     update_post_meta( $post_id, 'sage_roi_order_date_dates', $dates_save );
 
@@ -587,10 +892,34 @@ add_action( 'admin_footer-post.php', 'sage_roi_order_date_admin_scripts' );
 add_action( 'admin_footer-post-new.php', 'sage_roi_order_date_admin_scripts' );
 function sage_roi_order_date_admin_scripts() {
     global $post;
-    if ( ! $post || $post->post_type !== SAGE_ROI_ORDER_DATE_CPT ) return;
+    if ( ! $post || $post->post_type !== SAGE_ROI_ORDER_DATE_CPT ) {
+        return;
+    }
+    $tz  = wp_timezone();
+    $ref = new DateTime( '2024-01-01', $tz );
+    $wd  = array();
+    for ( $n = 1; $n <= 7; $n++ ) {
+        $d        = clone $ref;
+        $offset   = $n - 1;
+        $d->modify( '+' . $offset . ' days' );
+        $wd[ $n ] = date_i18n( 'l', $d->getTimestamp() );
+    }
+    $months = array();
+    for ( $m = 1; $m <= 12; $m++ ) {
+        $dm          = new DateTime( '2024-' . sprintf( '%02d', $m ) . '-15', $tz );
+        $months[ $m ] = date_i18n( 'F', $dm->getTimestamp() );
+    }
+    $l10n = array(
+        'monthlyTpl' => __( 'Repeat every %s of each month', 'sage-100-roi' ),
+        'weeklyTpl'  => __( 'Repeat every %s', 'sage-100-roi' ),
+        'yearlyTpl'  => __( 'Repeat annually on %s', 'sage-100-roi' ),
+        'weekdays'   => $wd,
+        'months'     => $months,
+    );
     ?>
     <script>
     (function($){
+        var sageRoiRepeatL10n = <?php echo wp_json_encode( $l10n ); ?>;
         $(function(){
             function getHolidaysMd() {
                 var raw = $('#sage-roi-holidays-md').val();
@@ -637,6 +966,30 @@ function sage_roi_order_date_admin_scripts() {
                 return n && openList.indexOf(n) !== -1;
             }
 
+            function ordinalEn(day) {
+                day = parseInt(day, 10);
+                var mod100 = day % 100, mod10 = day % 10, suf = 'th';
+                if (mod100 < 11 || mod100 > 13) {
+                    if (mod10 === 1) suf = 'st';
+                    else if (mod10 === 2) suf = 'nd';
+                    else if (mod10 === 3) suf = 'rd';
+                }
+                return day + suf;
+            }
+
+            function formatAnnualYmd(ymd) {
+                var t = ymd.split('-');
+                if (t.length !== 3) return '';
+                var m = parseInt(t[1], 10);
+                var dom = parseInt(t[2], 10);
+                var mo = sageRoiRepeatL10n.months[String(m)] || sageRoiRepeatL10n.months[m];
+                return mo ? (mo + ' ' + dom) : ymd;
+            }
+
+            function oneFmt(tpl, a) {
+                return tpl.replace('%s', a);
+            }
+
             function applyHolidayValidation($input, holidaysMd) {
                 $input.attr('title', '<?php echo esc_js( __( 'This date is blocked by global holidays.', 'sage-100-roi' ) ); ?>');
                 $input.off('change.sageRoiHoliday').on('change.sageRoiHoliday', function(){
@@ -652,17 +1005,40 @@ function sage_roi_order_date_admin_scripts() {
                 $input.off('change.sageRoiOpenWd').on('change.sageRoiOpenWd', function(){
                     var val = $(this).val();
                     if (val && !isWeekdayOpen(val, openList)) {
-                        alert('<?php echo esc_js( __( 'This weekday is not enabled under Order Dates > Settings (open weekdays).', 'sage-100-roi' ) ); ?>');
+                        alert('<?php echo esc_js( __( 'This weekday is not enabled under Order Dates - Settings (open weekdays).', 'sage-100-roi' ) ); ?>');
                         $(this).val('');
                     }
                 });
             }
 
+            function bindRepeatLabels($dateInput) {
+                var $row = $dateInput.closest('.sage-roi-date-row');
+                function sync() {
+                    var ymd = $dateInput.val();
+                    var $fs = $row.find('.sage-roi-date-repeat-fieldset');
+                    if (!ymd || ymd.length !== 10) {
+                        $fs.hide();
+                        return;
+                    }
+                    $fs.show();
+                    var t = ymd.split('-');
+                    var dom = parseInt(t[2], 10);
+                    $row.find('.sage-roi-repeat-label-monthly').text(oneFmt(sageRoiRepeatL10n.monthlyTpl, ordinalEn(dom)));
+                    var n = isoWeekdayFromYmd(ymd);
+                    var wn = sageRoiRepeatL10n.weekdays[String(n)] || sageRoiRepeatL10n.weekdays[n] || '';
+                    $row.find('.sage-roi-repeat-label-weekly').text(oneFmt(sageRoiRepeatL10n.weeklyTpl, wn));
+                    $row.find('.sage-roi-repeat-label-yearly').text(oneFmt(sageRoiRepeatL10n.yearlyTpl, formatAnnualYmd(ymd)));
+                }
+                $dateInput.off('change.sageRoiRepeat input.sageRoiRepeat').on('change.sageRoiRepeat input.sageRoiRepeat', sync);
+                sync();
+            }
+
             var holidaysMd = getHolidaysMd();
             var openWd = getOpenWeekdays();
-            $('#sage-roi-order-dates-list input[type="date"]').each(function(){
+            $('#sage-roi-order-dates-list .sage-roi-date-input').each(function(){
                 applyHolidayValidation($(this), holidaysMd);
                 applyOpenWeekdayValidation($(this), openWd);
+                bindRepeatLabels($(this));
             });
 
             $('#sage-roi-order-dates-list').on('click', '.sage-roi-remove-date', function(){
@@ -670,14 +1046,21 @@ function sage_roi_order_date_admin_scripts() {
             });
             $('.sage-roi-add-date').on('click', function(){
                 var tpl = document.getElementById('sage-roi-date-row-tpl');
-                if (tpl && tpl.content) {
-                    var frag = $(tpl.content.cloneNode(true));
-                    $('#sage-roi-order-dates-list').append(frag);
-                    frag.find('input[type="date"]').each(function(){
-                        applyHolidayValidation($(this), holidaysMd);
-                        applyOpenWeekdayValidation($(this), openWd);
-                    });
-                }
+                var $list = $('#sage-roi-order-dates-list');
+                if (!tpl || !tpl.content) return;
+                var idx = parseInt($list.attr('data-next-index'), 10);
+                if (isNaN(idx)) idx = 0;
+                var wrap = document.createElement('div');
+                wrap.appendChild(tpl.content.cloneNode(true));
+                var html = wrap.innerHTML.replace(/__INDEX__/g, String(idx));
+                $list.append(html);
+                $list.attr('data-next-index', String(idx + 1));
+                var $newRow = $list.children('.sage-roi-date-row').last();
+                $newRow.find('.sage-roi-date-input').each(function(){
+                    applyHolidayValidation($(this), holidaysMd);
+                    applyOpenWeekdayValidation($(this), openWd);
+                    bindRepeatLabels($(this));
+                });
             });
         });
     })(jQuery);
@@ -716,15 +1099,49 @@ function sage_roi_order_date_get_available_dates() {
 
         foreach ( $items as $item ) {
             $d = is_array( $item ) && isset( $item['date'] ) ? $item['date'] : ( is_string( $item ) ? $item : '' );
-            if ( empty( $d ) ) continue;
+            if ( empty( $d ) ) {
+                continue;
+            }
 
-            $dt = DateTime::createFromFormat( 'Y-m-d', $d );
-            if ( ! $dt ) continue;
-            $dt->setTime( 0, 0, 0 );
+            $dt = sage_roi_order_date_parse_ymd( $d );
+            if ( ! $dt ) {
+                continue;
+            }
 
             $md = $dt->format( 'm-d' );
             if ( ! in_array( $md, $holidays_md, true ) && sage_roi_order_date_is_date_selectable( $dt, $now, $cutoff_hour ) && sage_roi_order_date_is_weekday_open( $dt ) ) {
                 $all_dates[ $d ] = $d;
+            }
+
+            $repeat_m = is_array( $item ) && ! empty( $item['repeat_monthly'] );
+            $repeat_w = is_array( $item ) && ! empty( $item['repeat_weekly'] );
+            $repeat_y = is_array( $item ) && ! empty( $item['repeat_yearly'] );
+            if ( ! $repeat_m && ! $repeat_w && ! $repeat_y ) {
+                continue;
+            }
+
+            $extra_m = sage_roi_order_date_get_repeat_months_count();
+            $extra_w = sage_roi_order_date_get_repeat_weeks_count();
+            $extra_y = sage_roi_order_date_get_repeat_years_count();
+
+            $candidates = array();
+            if ( $repeat_m ) {
+                $candidates = array_merge( $candidates, sage_roi_order_date_expand_monthly_occurrences( $d, $extra_m ) );
+            }
+            if ( $repeat_w ) {
+                $candidates = array_merge( $candidates, sage_roi_order_date_expand_weekly_occurrences( $d, $extra_w ) );
+            }
+            if ( $repeat_y ) {
+                $candidates = array_merge( $candidates, sage_roi_order_date_expand_yearly_occurrences( $d, $extra_y ) );
+            }
+            $candidates = array_unique( $candidates );
+            foreach ( $candidates as $cand ) {
+                if ( $cand === $d ) {
+                    continue;
+                }
+                if ( sage_roi_order_date_is_candidate_eligible( $cand, $holidays_md, $now, $cutoff_hour ) ) {
+                    $all_dates[ $cand ] = $cand;
+                }
             }
         }
     }
@@ -777,11 +1194,10 @@ function sage_roi_order_date_is_date_selectable( DateTime $candidate, DateTime $
 }
 
 function sage_roi_order_date_calculate_final_order_date( $delivery_date, $business_days_before = null, $format = 'Y-m-d' ) {
-    $delivery_dt = DateTime::createFromFormat( 'Y-m-d', (string) $delivery_date, wp_timezone() );
+    $delivery_dt = sage_roi_order_date_parse_ymd( (string) $delivery_date );
     if ( ! $delivery_dt ) {
         return '';
     }
-    $delivery_dt->setTime( 0, 0, 0 );
 
     if ( null === $business_days_before ) {
         $business_days_before = (int) get_option( SAGE_ROI_ORDER_DATE_BUSINESS_DAYS_OPTION, 1 );
@@ -1000,7 +1416,7 @@ function sage_roi_order_date_normalize_selected_for_list( $selected, $dates ) {
 }
 
 /**
- * Shared: delivery date &lt;select&gt; options (Y-m-d values, site date_format labels). No placeholder row. Earliest first.
+ * Shared: delivery date &lt;select&gt; options (Y-m-d values; labels = e.g. April 17, 2026 - Friday). No placeholder row. Earliest first.
  */
 function sage_roi_order_date_echo_delivery_select( $selected, $dates ) {
     $selected = sage_roi_order_date_normalize_selected_for_list( $selected, $dates );
@@ -1241,7 +1657,7 @@ function sage_roi_order_date_render_cart_notice_inner( $delivery_date_override =
     }
 
     $template     = sage_roi_order_date_get_cart_notice_template_string();
-    $display_date = sage_roi_order_date_format_notice_short_date( $delivery_date );
+    $display_date = sage_roi_order_date_format_delivery_display_label( $delivery_date );
     $message      = str_replace( '{delivery_date}', esc_html( $display_date ), $template );
 
     echo '<div class="sage-roi-cart-delivery-notice" style="margin:12px 0 0 0;">' . wp_kses_post( $message ) . '</div>';
@@ -1301,19 +1717,16 @@ function sage_roi_order_date_get_notice_template_parts_for_js() {
 
 /**
  * @param string[] $dates Y-m-d list.
- * @return array<string,string> Same short display as cart notice (`n/j/y`).
+ * @return array<string,string> Value Y-m-d → same label as cart/checkout ({@see sage_roi_order_date_format_delivery_display_label}).
  */
 function sage_roi_order_date_get_date_labels_for_js( array $dates ) {
     $out = array();
     foreach ( $dates as $d ) {
-        $out[ $d ] = sage_roi_order_date_format_notice_short_date( $d );
+        $out[ $d ] = sage_roi_order_date_format_delivery_display_label( $d );
     }
     return $out;
 }
 
-/**
- * True when the store’s checkout uses the Checkout block (page or block theme template).
- */
 /**
  * @return \Automattic\WooCommerce\Blocks\Domain\Services\CheckoutFields|null
  */
@@ -1324,6 +1737,9 @@ function sage_roi_order_date_blocks_checkout_fields() {
     return \Automattic\WooCommerce\Blocks\Package::container()->get( \Automattic\WooCommerce\Blocks\Domain\Services\CheckoutFields::class );
 }
 
+/**
+ * Whether the checkout page uses the block checkout template (or block theme).
+ */
 function sage_roi_order_date_is_checkout_block_page() {
     if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
         return false;
@@ -1530,8 +1946,8 @@ function sage_roi_order_date_display_in_admin( $order ) {
             $date = $cf->get_field_from_object( SAGE_ROI_ORDER_DATE_FIELD_ID, $order, 'other' );
         }
     }
-    if ( ! $date ) return;
-    $dt = DateTime::createFromFormat( 'Y-m-d', $date );
-    $formatted = $dt ? $dt->format( get_option( 'date_format' ) ) : $date;
-    echo '<p><strong>' . esc_html__( 'Order Date', 'sage-100-roi' ) . ':</strong> ' . esc_html( $formatted ) . '</p>';
+    if ( ! $date ) {
+        return;
+    }
+    echo '<p><strong>' . esc_html__( 'Order Date', 'sage-100-roi' ) . ':</strong> ' . esc_html( sage_roi_order_date_format_delivery_display_label( $date ) ) . '</p>';
 }
