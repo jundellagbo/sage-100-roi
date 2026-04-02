@@ -384,6 +384,7 @@ function sage_roi_submit_order_to_api( $orderId ) {
     $args = array(
         "SalesOrderNo" => $orderId,
         "OrderDate" => $final_order_date_ymd,
+        "PaymentType" => "ACH",
         "OrderType" => "C",
         "DateTimeProcessed" => $order->order_date,
         "DateCreatedUtc" => $order->order_date,
