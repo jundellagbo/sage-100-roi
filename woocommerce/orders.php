@@ -513,7 +513,7 @@ function sage_roi_submit_order_to_api( $orderId ) {
 
 
     # resync items after order for stock management
-    sage_roi_set_product_ids( $itemCodes );
+    # sage_roi_set_product_ids( $itemCodes );
 
     # Sync Woo order from Sage history when available; otherwise use submission response (history may lag or use a different key).
     $history_search = sage_roi_refetch_order( $orderId );

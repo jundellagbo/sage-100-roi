@@ -49,3 +49,15 @@ function sage_roi_get_cart_count_ajax() {
     wp_die();
 }
 
+add_action( 'woocommerce_add_to_cart', 'sage_roi_sync_product_on_add_to_cart', 10, 6 );
+function sage_roi_sync_product_on_add_to_cart( $cart_item_key, $product_id, $quantity, $variation_id, $variation, $cart_item_data ) {
+    $product = wc_get_product( $variation_id ? $variation_id : $product_id );
+    if ( ! $product || ! is_a( $product, 'WC_Product' ) ) {
+        return;
+    }
+    $sku = $product->get_sku();
+    if ( ! $sku ) {
+        return;
+    }
+    sage_roi_set_product_ids( array( $sku ) );
+}
