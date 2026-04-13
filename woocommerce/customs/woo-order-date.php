@@ -6,7 +6,7 @@
  * - Multiple dates per config, assignable to users
  * - Global option to repeat specific days per month (Settings page only)
  * - Global holidays (excluded from selection) and open weekdays (delivery + Sage OrderDate business-day math)
- * - Dropdown delivery options exclude dates whose derived Sage order date is before today + N open weekdays (N = Business Days Before Delivery)
+ * - Business Days Before Delivery only affects Sage OrderDate ({@see sage_roi_order_date_calculate_final_order_date()}), not which dates appear in the cart/checkout dropdown
  * - Cart + classic checkout: delivery date dropdown + settings notice (session + POST; UI inside #payment so AJAX refresh includes it)
  * - Elementor Pro Cart widget: inject before .wc-proceed-to-checkout when the WC hook does not run
  * - WooCommerce Cart block: same UI via assets/cart-delivery.js + AJAX (above Proceed to checkout)
@@ -1168,7 +1168,13 @@ function sage_roi_order_date_get_available_dates() {
     }
 
     $sorted = sage_roi_order_date_sort_dates_asc( array_values( $all_dates ) );
-    return sage_roi_order_date_filter_delivery_dates_for_dropdown( $sorted, $now );
+    $out    = array();
+    foreach ( $sorted as $ymd ) {
+        if ( sage_roi_order_date_is_sage_submit_date_on_or_after_today( $ymd, $now ) ) {
+            $out[] = $ymd;
+        }
+    }
+    return $out;
 }
 
 function sage_roi_order_date_is_date_selectable( DateTime $candidate, DateTime $now, $cutoff_hour = 10 ) {
@@ -1224,53 +1230,25 @@ function sage_roi_order_date_calculate_final_order_date( $delivery_date, $busine
 }
 
 /**
- * Advance from a calendar day by N open weekdays (forward; same open-weekday list as {@see sage_roi_order_date_calculate_final_order_date()}).
+ * True if the Sage OrderDate implied by a delivery Y-m-d (business-day offset) is not before “today” in site time.
+ * Used to drop dropdown options that would submit a past OrderDate to Sage.
  *
- * @param DateTime $from Midnight-normalized start day.
- * @param int      $n    Business days to add (0 = same day).
+ * @param string   $delivery_ymd Customer-selected delivery date Y-m-d.
+ * @param DateTime $now          Current instant (same timezone as {@see sage_roi_order_date_get_available_dates()}).
+ * @return bool
  */
-function sage_roi_order_date_step_open_weekdays_forward( DateTime $from, $n ) {
-    $open = sage_roi_order_date_get_business_weekdays();
-    $n    = max( 0, (int) $n );
-    $dt   = clone $from;
-    $dt->setTime( 0, 0, 0 );
-    $added = 0;
-    $guard = 0;
-    while ( $added < $n && $guard < 400 ) {
-        $dt->modify( '+1 day' );
-        if ( in_array( (int) $dt->format( 'N' ), $open, true ) ) {
-            $added++;
-        }
-        $guard++;
+function sage_roi_order_date_is_sage_submit_date_on_or_after_today( $delivery_ymd, DateTime $now ) {
+    $final_ymd = sage_roi_order_date_calculate_final_order_date( (string) $delivery_ymd, null, 'Y-m-d' );
+    if ( $final_ymd === '' ) {
+        return false;
     }
-    return $dt;
-}
-
-/**
- * Keep delivery Y-m-d values whose Sage order date (from business-days-before rules) is on/after
- * “today + N” open weekdays (N = {@see SAGE_ROI_ORDER_DATE_BUSINESS_DAYS_OPTION}). Used once at the end of {@see sage_roi_order_date_get_available_dates()}.
- *
- * @param string[] $dates Candidate Y-m-d strings.
- * @param DateTime $now   Same clock as used when building $dates.
- * @return string[]
- */
-function sage_roi_order_date_filter_delivery_dates_for_dropdown( array $dates, DateTime $now ) {
-    $n = max( 0, (int) get_option( SAGE_ROI_ORDER_DATE_BUSINESS_DAYS_OPTION, 1 ) );
+    $final_dt = sage_roi_order_date_parse_ymd( $final_ymd );
+    if ( ! $final_dt ) {
+        return false;
+    }
     $today = clone $now;
     $today->setTime( 0, 0, 0 );
-    $min_final = sage_roi_order_date_step_open_weekdays_forward( $today, $n )->format( 'Y-m-d' );
-
-    $out = array();
-    foreach ( $dates as $d ) {
-        if ( ! is_string( $d ) || $d === '' ) {
-            continue;
-        }
-        $final = sage_roi_order_date_calculate_final_order_date( $d, null, 'Y-m-d' );
-        if ( $final !== '' && $final >= $min_final ) {
-            $out[] = $d;
-        }
-    }
-    return sage_roi_order_date_sort_dates_asc( $out );
+    return $final_dt >= $today;
 }
 
 /**
