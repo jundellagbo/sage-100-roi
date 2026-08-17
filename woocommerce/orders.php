@@ -181,7 +181,7 @@ function sage_roi_refetch_order( $orderId ) {
             'Content-Type' => 'application/json',
             'Authorization' => 'Bearer ' . $fds->decrypt(sage_roi_get_option('access_token'))
         ),
-        'body' => '"x => x.SalesOrderNo == \"' . $orderId . '\""'
+        'body' => wp_json_encode( 'x => x.SalesOrderNo == "' . sage_roi_linq_string( $orderId ) . '"' )
     ));
 
     if ( is_wp_error( $response ) ) {
@@ -314,10 +314,12 @@ function sage_roi_set_customer_order( $orderObject, $wc_order_id = null ) {
     $order->set_date_created( sage_roi_api_date( $orderObject->OrderDate ) );
     $order->set_date_paid( sage_roi_api_date( $orderObject->OrderDate ) );
 
-    $order->update_meta_data( sage_roi_option_key( 'SalesOrderNo' ), $orderObject->SalesOrderNo );
-    $order->update_meta_data( sage_roi_option_key( 'order_json' ), json_encode($orderObject, true) );
-
     $order->save();
+
+    // After save: these go through the post-meta API because WooCommerce's CRUD cannot see
+    // `wp_`-prefixed keys, so update_meta_data() appended a fresh row on every sync run.
+    sage_roi_order_meta_set( $order, 'SalesOrderNo', $orderObject->SalesOrderNo );
+    sage_roi_order_meta_set( $order, 'order_json', wp_json_encode( sage_roi_slim_order_json( $orderObject ) ) );
 
     // disable sending email
     add_filter('woocommerce_new_order_email_allows_resend', '__return_false' );
@@ -332,7 +334,7 @@ function sage_roi_set_customer_order( $orderObject, $wc_order_id = null ) {
         $pSku = $productForMeta->get_sku();
         foreach ( sage_roi_sage_order_header_detail_lines( $orderObject ) as $oitems ) {
             if ( sage_roi_sage_order_line_item_code( $oitems ) === $pSku ) {
-                wc_update_order_item_meta( $item_id, sage_roi_option_key( 'order_item_json' ), wp_json_encode( $oitems ) );
+                wc_update_order_item_meta( $item_id, sage_roi_option_key( 'order_item_json' ), wp_json_encode( sage_roi_slim_order_item_json( $oitems ) ) );
             }
         }
     }
@@ -343,6 +345,9 @@ function sage_roi_set_customer_order( $orderObject, $wc_order_id = null ) {
 function sage_roi_submit_order_to_api( $orderId ) {
 
     $order = wc_get_order( $orderId );
+    if ( ! $order ) {
+        return false;
+    }
 
     $customerId = $order->get_customer_id();
 
@@ -363,7 +368,14 @@ function sage_roi_submit_order_to_api( $orderId ) {
 
     // refetching and auto update customer record from SAGE API
     $fetchedCustomer = sage_roi_get_customer_in_sage( $customerJson->EmailAddress );
-    if( !$fetchedCustomer ) {
+    if ( is_wp_error( $fetchedCustomer ) ) {
+        // Sage was unreachable, not "customer is gone" — leave the order unsubmitted so the
+        // retry below can pick it up rather than treating it as permanently rejected.
+        sage_roi_log_order_submission_failure( $order, $fetchedCustomer->get_error_message() );
+        return $fetchedCustomer;
+    }
+    if ( ! is_object( $fetchedCustomer ) ) {
+        sage_roi_log_order_submission_failure( $order, 'Customer ' . $customerJson->EmailAddress . ' was not found in Sage.' );
         return false;
     }
 
@@ -379,6 +391,14 @@ function sage_roi_submit_order_to_api( $orderId ) {
     if ( $final_order_date_ymd === '' ) {
         $ts = $order->get_date_created() ? $order->get_date_created()->getTimestamp() : time();
         $final_order_date_ymd = date( 'Ymd', $ts );
+    }
+    // Falling back to the submission date is how a Milton order reached Sage dated Tuesday
+    // instead of the Thursday delivery, and nothing said so until a truck had to be sent out.
+    if ( empty( $sage_submit_dates['delivery_ymd'] ) ) {
+        $order->add_order_note( sprintf(
+            'Sage 100: no delivery date was available for this order, so it was submitted with the order date %s. Check Order Dates for this store.',
+            $final_order_date_ymd
+        ) );
     }
 
     $fetchedCustomer->DefaultPaymentType = "ACH";
@@ -421,17 +441,23 @@ function sage_roi_submit_order_to_api( $orderId ) {
     $itemCodes = array();
     foreach( $order->get_items() as $item_id => $item ) {
         $product = $item->get_product();
-        $pSku = $product->get_sku();
-        $itemCodes[] = $pSku;
+        if ( ! $product ) {
+            continue;
+        }
+        $itemCodes[] = $product->get_sku();
     }
 
     $productApis = sage_roi_set_product_ids( $itemCodes );
     $lineKey = 0;
     foreach( $order->get_items() as $item_id => $item ) {
-        $lineKey++;
         $product = $item->get_product();
+        // A product deleted after the order was placed would otherwise fatal here.
+        if ( ! $product ) {
+            continue;
+        }
+        $lineKey++;
         $pSku = $product->get_sku();
-        
+
         $salesOrderDetails = array(
             "SalesOrderNo" => $orderId,
             "ItemCode" => $pSku,
@@ -493,7 +519,20 @@ function sage_roi_submit_order_to_api( $orderId ) {
     ));
 
     if ( is_wp_error( $submitOrderResponse ) ) {
-        return $submitOrderResponse->get_error_message();
+        sage_roi_log_order_submission_failure( $order, $submitOrderResponse->get_error_message() );
+        return $submitOrderResponse;
+     }
+
+     // Marking thankyou_action_done on a rejected submission would strand the order, so a
+     // non-2xx has to fail loudly enough for the retry to see it.
+     $submitResponseCode = (int) wp_remote_retrieve_response_code( $submitOrderResponse );
+     if ( $submitResponseCode < 200 || $submitResponseCode >= 300 ) {
+        $error = new WP_Error(
+            'sage_roi_order_submit_failed',
+            sprintf( 'Sage order submission returned HTTP %d', $submitResponseCode )
+        );
+        sage_roi_log_order_submission_failure( $order, $error->get_error_message() );
+        return $error;
      }
 
      $submitOrderResponseResults = json_decode( $submitOrderResponse['body'] );
@@ -501,14 +540,11 @@ function sage_roi_submit_order_to_api( $orderId ) {
      $sage_sales_no = ( is_object( $submitOrderResponseResults ) && ! empty( $submitOrderResponseResults->SalesOrderNo ) )
         ? $submitOrderResponseResults->SalesOrderNo
         : $orderId;
-     $order->update_meta_data( sage_roi_option_key( 'SalesOrderNo' ), $sage_sales_no );
-     $order->update_meta_data( sage_roi_option_key( 'sage_final_order_date' ), isset( $sage_submit_dates['final_ymd'] ) ? $sage_submit_dates['final_ymd'] : '' );
-
-     $order->update_meta_data( sage_roi_option_key( 'submitted_order_json' ), wp_json_encode( $submitOrderResponseResults ) );
-
-     $order->update_meta_data( sage_roi_option_key( 'submitted_order_payload_json' ), wp_json_encode( $args ) );
-
-     $order->update_meta_data( sage_roi_option_key( 'thankyou_action_done' ), true );
+     sage_roi_order_meta_set( $order, 'SalesOrderNo', $sage_sales_no );
+     sage_roi_order_meta_set( $order, 'sage_final_order_date', isset( $sage_submit_dates['final_ymd'] ) ? $sage_submit_dates['final_ymd'] : '' );
+     sage_roi_order_meta_set( $order, 'submitted_order_json', wp_json_encode( $submitOrderResponseResults ) );
+     sage_roi_order_meta_set( $order, 'submitted_order_payload_json', wp_json_encode( $args ) );
+     sage_roi_order_meta_set( $order, 'thankyou_action_done', true );
 
     $order->save();
 
@@ -527,12 +563,87 @@ function sage_roi_submit_order_to_api( $orderId ) {
 
 
 add_action('woocommerce_thankyou', 'sage_roi_process_order');
+add_action('sage_roi_retry_order_submission', 'sage_roi_retry_order_submission');
 
+/**
+ * Orders 7235-7237 were lost because a Sage outage threw inside this hook: the customer got
+ * "There has been a critical error on this website" on the order-received page and the order
+ * never reached Sage. The submission is best-effort from here on — the page always renders,
+ * and anything unfinished is retried in the background.
+ */
 function sage_roi_process_order( $orderId ) {
 
-    if( ! get_post_meta( $orderId, sage_roi_option_key( 'thankyou_action_done' ), true ) ) {
+    if ( get_post_meta( $orderId, sage_roi_option_key( 'thankyou_action_done' ), true ) ) {
+        return;
+    }
 
-        return sage_roi_submit_order_to_api( $orderId );
+    try {
+        $result = sage_roi_submit_order_to_api( $orderId );
+    } catch ( Throwable $e ) {
+        $order = wc_get_order( $orderId );
+        if ( $order ) {
+            sage_roi_log_order_submission_failure( $order, $e->getMessage() );
+        }
+        $result = new WP_Error( 'sage_roi_order_submit_exception', $e->getMessage() );
+    }
+
+    if ( is_wp_error( $result ) ) {
+        sage_roi_schedule_order_submission_retry( $orderId );
+    }
+
+    return $result;
+}
+
+/** @param int $orderId */
+function sage_roi_retry_order_submission( $orderId ) {
+    if ( get_post_meta( $orderId, sage_roi_option_key( 'thankyou_action_done' ), true ) ) {
+        return;
+    }
+
+    try {
+        $result = sage_roi_submit_order_to_api( $orderId );
+    } catch ( Throwable $e ) {
+        $result = new WP_Error( 'sage_roi_order_submit_exception', $e->getMessage() );
+    }
+
+    if ( is_wp_error( $result ) ) {
+        sage_roi_schedule_order_submission_retry( $orderId );
+    }
+}
+
+/**
+ * Backs off 15m, 1h, 4h, 12h, then gives up and leaves the order note as the trail. Sage
+ * outages have lasted hours, so retrying sooner just fills the log.
+ */
+function sage_roi_schedule_order_submission_retry( $orderId ) {
+    if ( ! function_exists( 'as_schedule_single_action' ) || ! function_exists( 'as_next_scheduled_action' ) ) {
+        return;
+    }
+
+    $attemptKey = sage_roi_option_key( 'submit_retry_attempt' );
+    $attempt    = (int) get_post_meta( $orderId, $attemptKey, true );
+    $delays     = array( 15 * MINUTE_IN_SECONDS, HOUR_IN_SECONDS, 4 * HOUR_IN_SECONDS, 12 * HOUR_IN_SECONDS );
+
+    if ( ! isset( $delays[ $attempt ] ) ) {
+        return;
+    }
+    if ( as_next_scheduled_action( 'sage_roi_retry_order_submission', array( $orderId ) ) ) {
+        return;
+    }
+
+    update_post_meta( $orderId, $attemptKey, $attempt + 1 );
+    as_schedule_single_action( time() + $delays[ $attempt ], 'sage_roi_retry_order_submission', array( $orderId ) );
+}
+
+/** Order notes are where support already looks, so failures land there as well as the log. */
+function sage_roi_log_order_submission_failure( $order, $message ) {
+    $message = 'Sage 100: order was not submitted — ' . $message;
+
+    if ( is_a( $order, 'WC_Order' ) ) {
+        $order->add_order_note( $message );
+    }
+    if ( function_exists( 'wc_get_logger' ) ) {
+        wc_get_logger()->error( $message, array( 'source' => 'sage-100-roi' ) );
     }
 }
 
@@ -544,7 +655,7 @@ add_filter( 'woocommerce_admin_order_preview_get_order_details', 'sage_roi_admin
 function sage_roi_admin_order_preview_add_custom_meta_data( $data, $order ) {
     $email = $order->get_billing_email();
     $customer = $email ? sage_roi_get_customer_in_sage( $email ) : false;
-    $data['sage_roi_customer_not_in_sage'] = empty( $customer ) || is_string( $customer );
+    $data['sage_roi_customer_not_in_sage'] = ! is_object( $customer ) || is_wp_error( $customer );
 
     $data['sage_roi_sales_order_no'] = get_post_meta( $order->get_id(), sage_roi_option_key( 'SalesOrderNo' ), true );
     $data['submitted_order_payload_json'] = get_post_meta( $order->get_id(), sage_roi_option_key( 'submitted_order_payload_json' ), true );

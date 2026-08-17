@@ -11,13 +11,19 @@ function sage_roi_items_sku_image_sync_auto_assign( $productSKU = null ) {
     $imageIds = array();
 
     // getting galleries
-    $galleries = $wpdb->get_results( "SELECT ID FROM $wpdb->posts WHERE post_title LIKE '$productSKU%' AND post_type = 'attachment'  AND post_mime_type LIKE 'image%'", OBJECT );
+    $galleries = $wpdb->get_results( $wpdb->prepare(
+        "SELECT ID FROM $wpdb->posts WHERE post_title LIKE %s AND post_type = 'attachment' AND post_mime_type LIKE 'image%%'",
+        $wpdb->esc_like( $productSKU ) . '%'
+    ), OBJECT );
     foreach($galleries as $gallery) {
         $imageIds[] = $gallery->ID;
     }
 
     // thumbnail setter
-    $postThumbnail = $wpdb->get_results( "SELECT ID FROM $wpdb->posts WHERE post_title='$productSKU' AND post_type = 'attachment'  AND post_mime_type LIKE 'image%'", OBJECT );
+    $postThumbnail = $wpdb->get_results( $wpdb->prepare(
+        "SELECT ID FROM $wpdb->posts WHERE post_title = %s AND post_type = 'attachment' AND post_mime_type LIKE 'image%%'",
+        $productSKU
+    ), OBJECT );
     $theThumbnail = null;
     if(count( $postThumbnail )) {
         $theThumbnail = $postThumbnail[0]->ID;

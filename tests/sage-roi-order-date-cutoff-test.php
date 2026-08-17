@@ -153,13 +153,13 @@ function sage_roi_order_date_cutoff_test_simulate_dropdown_dates( DateTime $now,
 
 		$candidates = array();
 		if ( $repeat_m ) {
-			$candidates = array_merge( $candidates, sage_roi_order_date_expand_monthly_occurrences( $d, $extra_m ) );
+			$candidates = array_merge( $candidates, sage_roi_order_date_expand_monthly_occurrences( $d, $extra_m, $today ) );
 		}
 		if ( $repeat_w ) {
-			$candidates = array_merge( $candidates, sage_roi_order_date_expand_weekly_occurrences( $d, $extra_w ) );
+			$candidates = array_merge( $candidates, sage_roi_order_date_expand_weekly_occurrences( $d, $extra_w, $today ) );
 		}
 		if ( $repeat_y ) {
-			$candidates = array_merge( $candidates, sage_roi_order_date_expand_yearly_occurrences( $d, $extra_y ) );
+			$candidates = array_merge( $candidates, sage_roi_order_date_expand_yearly_occurrences( $d, $extra_y, $today ) );
 		}
 		$candidates = array_unique( $candidates );
 		foreach ( $candidates as $cand ) {

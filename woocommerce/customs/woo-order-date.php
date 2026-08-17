@@ -128,75 +128,108 @@ function sage_roi_order_date_repeat_labels_for_ymd( $ymd ) {
 }
 
 /**
- * @param string   $anchor_ymd Y-m-d.
- * @param int      $extra_months Number of additional months after anchor (total months = 1 + extra).
+ * A repeat is a standing pattern, so its window has to follow the calendar. Emitting a fixed
+ * run of occurrences from the anchor instead meant every store's dates ran out a few weeks
+ * after setup, leaving checkout with nothing to select and Sage with the submission date.
+ *
+ * Walks the recurrence to the first occurrence on or after `$from`, then returns
+ * `1 + $extra` from there.
+ *
+ * @param callable      $occurrence Maps an integer step to its DateTime.
+ * @param int           $extra      Occurrences to emit after the first.
+ * @param DateTime|null $from       Window start; defaults to today.
+ * @param int           $max_steps  Guard against a pattern that never reaches the window.
  * @return string[] Y-m-d.
  */
-function sage_roi_order_date_expand_monthly_occurrences( $anchor_ymd, $extra_months ) {
+function sage_roi_order_date_occurrences_from( callable $occurrence, $extra, $from, $max_steps ) {
+    if ( ! $from instanceof DateTime ) {
+        $from = new DateTime( 'now', wp_timezone() );
+    }
+    $from = clone $from;
+    $from->setTime( 0, 0, 0 );
+
+    $skip = 0;
+    while ( $skip < $max_steps && $occurrence( $skip ) < $from ) {
+        $skip++;
+    }
+
+    $out   = array();
+    $extra = max( 0, (int) $extra );
+    for ( $k = $skip; $k <= $skip + $extra; $k++ ) {
+        $out[] = $occurrence( $k )->format( 'Y-m-d' );
+    }
+    return $out;
+}
+
+/**
+ * @param string        $anchor_ymd   Y-m-d.
+ * @param int           $extra_months Occurrences after the first in the window (total = 1 + extra).
+ * @param DateTime|null $from         Window start; defaults to today.
+ * @return string[] Y-m-d.
+ */
+function sage_roi_order_date_expand_monthly_occurrences( $anchor_ymd, $extra_months, DateTime $from = null ) {
     $dt = sage_roi_order_date_parse_ymd( $anchor_ymd );
     if ( ! $dt ) {
         return array();
     }
     $dom = (int) $dt->format( 'j' );
-    $out = array();
-    $extra_months = max( 0, (int) $extra_months );
-    for ( $k = 0; $k <= $extra_months; $k++ ) {
+
+    $occurrence = function ( $k ) use ( $dt, $dom ) {
+        // Step from the 1st: a 31st anchor would otherwise overflow into the following month.
         $c = clone $dt;
-        if ( $k > 0 ) {
-            $c->modify( '+' . $k . ' months' );
-        }
-        $y    = (int) $c->format( 'Y' );
-        $m    = (int) $c->format( 'n' );
-        $last = (int) $c->format( 't' );
-        $use  = min( $dom, $last );
-        $c->setDate( $y, $m, $use );
-        $out[] = $c->format( 'Y-m-d' );
-    }
-    return $out;
+        $c->setDate( (int) $dt->format( 'Y' ), (int) $dt->format( 'n' ), 1 );
+        $c->modify( '+' . (int) $k . ' months' );
+        $c->setDate( (int) $c->format( 'Y' ), (int) $c->format( 'n' ), min( $dom, (int) $c->format( 't' ) ) );
+        return $c;
+    };
+
+    return sage_roi_order_date_occurrences_from( $occurrence, $extra_months, $from, 600 );
 }
 
 /**
- * @param string $anchor_ymd Y-m-d.
- * @param int    $extra_weeks Number of additional weeks after anchor (total = 1 + extra).
+ * @param string        $anchor_ymd  Y-m-d.
+ * @param int           $extra_weeks Occurrences after the first in the window (total = 1 + extra).
+ * @param DateTime|null $from        Window start; defaults to today.
  * @return string[]
  */
-function sage_roi_order_date_expand_weekly_occurrences( $anchor_ymd, $extra_weeks ) {
+function sage_roi_order_date_expand_weekly_occurrences( $anchor_ymd, $extra_weeks, DateTime $from = null ) {
     $dt = sage_roi_order_date_parse_ymd( $anchor_ymd );
     if ( ! $dt ) {
         return array();
     }
-    $out          = array();
-    $extra_weeks = max( 0, (int) $extra_weeks );
-    for ( $k = 0; $k <= $extra_weeks; $k++ ) {
+
+    $occurrence = function ( $k ) use ( $dt ) {
         $c = clone $dt;
         if ( $k > 0 ) {
-            $c->modify( '+' . ( $k * 7 ) . ' days' );
+            $c->modify( '+' . ( (int) $k * 7 ) . ' days' );
         }
-        $out[] = $c->format( 'Y-m-d' );
-    }
-    return $out;
+        return $c;
+    };
+
+    return sage_roi_order_date_occurrences_from( $occurrence, $extra_weeks, $from, 5000 );
 }
 
 /**
- * @param string $anchor_ymd Y-m-d.
- * @param int    $extra_years Number of additional years after anchor (total = 1 + extra).
+ * @param string        $anchor_ymd  Y-m-d.
+ * @param int           $extra_years Occurrences after the first in the window (total = 1 + extra).
+ * @param DateTime|null $from        Window start; defaults to today.
  * @return string[]
  */
-function sage_roi_order_date_expand_yearly_occurrences( $anchor_ymd, $extra_years ) {
+function sage_roi_order_date_expand_yearly_occurrences( $anchor_ymd, $extra_years, DateTime $from = null ) {
     $dt = sage_roi_order_date_parse_ymd( $anchor_ymd );
     if ( ! $dt ) {
         return array();
     }
-    $out          = array();
-    $extra_years = max( 0, (int) $extra_years );
-    for ( $k = 0; $k <= $extra_years; $k++ ) {
+
+    $occurrence = function ( $k ) use ( $dt ) {
         $c = clone $dt;
         if ( $k > 0 ) {
-            $c->modify( '+' . $k . ' years' );
+            $c->modify( '+' . (int) $k . ' years' );
         }
-        $out[] = $c->format( 'Y-m-d' );
-    }
-    return $out;
+        return $c;
+    };
+
+    return sage_roi_order_date_occurrences_from( $occurrence, $extra_years, $from, 200 );
 }
 
 /**
@@ -359,9 +392,8 @@ function sage_roi_order_date_save_order_delivery_meta( $order, $date_ymd ) {
     if ( ! in_array( $date_ymd, $available, true ) ) {
         return false;
     }
-    $order->update_meta_data( sage_roi_option_key( 'order_date' ), $date_ymd );
-    $order->update_meta_data( sage_roi_option_key( 'sage_final_order_date' ), sage_roi_order_date_calculate_final_order_date( $date_ymd, null, 'Y-m-d' ) );
-    $order->save();
+    sage_roi_order_meta_set( $order, 'order_date', $date_ymd );
+    sage_roi_order_meta_set( $order, 'sage_final_order_date', sage_roi_order_date_calculate_final_order_date( $date_ymd, null, 'Y-m-d' ) );
     return true;
 }
 
@@ -846,7 +878,11 @@ function sage_roi_order_date_settings_footer_scripts() {
 add_action( 'save_post_' . SAGE_ROI_ORDER_DATE_CPT, 'sage_roi_order_date_save', 10, 2 );
 function sage_roi_order_date_save( $post_id, $post ) {
     if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return;
-    if ( ! isset( $_POST['sage_roi_order_date_nonce'] ) || ! wp_verify_nonce( $_POST['sage_roi_order_date_nonce'], 'sage_roi_order_date_save' ) ) {
+    if ( ! isset( $_POST['sage_roi_order_date_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['sage_roi_order_date_nonce'] ) ), 'sage_roi_order_date_save' ) ) {
+        return;
+    }
+    // The nonce proves the request came from the form, not that this user may edit the post.
+    if ( ! current_user_can( 'edit_post', $post_id ) ) {
         return;
     }
 
@@ -1126,13 +1162,13 @@ function sage_roi_order_date_get_available_dates() {
 
             $candidates = array();
             if ( $repeat_m ) {
-                $candidates = array_merge( $candidates, sage_roi_order_date_expand_monthly_occurrences( $d, $extra_m ) );
+                $candidates = array_merge( $candidates, sage_roi_order_date_expand_monthly_occurrences( $d, $extra_m, $today ) );
             }
             if ( $repeat_w ) {
-                $candidates = array_merge( $candidates, sage_roi_order_date_expand_weekly_occurrences( $d, $extra_w ) );
+                $candidates = array_merge( $candidates, sage_roi_order_date_expand_weekly_occurrences( $d, $extra_w, $today ) );
             }
             if ( $repeat_y ) {
-                $candidates = array_merge( $candidates, sage_roi_order_date_expand_yearly_occurrences( $d, $extra_y ) );
+                $candidates = array_merge( $candidates, sage_roi_order_date_expand_yearly_occurrences( $d, $extra_y, $today ) );
             }
             $candidates = array_unique( $candidates );
             foreach ( $candidates as $cand ) {
@@ -1261,8 +1297,7 @@ function sage_roi_order_date_resolve_delivery_ymd_for_order( $order ) {
     if ( ! $order instanceof WC_Order ) {
         return '';
     }
-    $key = sage_roi_option_key( 'order_date' );
-    $d   = $order->get_meta( $key );
+    $d = sage_roi_order_meta_get( $order, 'order_date' );
     if ( is_string( $d ) && preg_match( '/^\d{4}-\d{2}-\d{2}$/', trim( $d ) ) ) {
         return trim( $d );
     }
@@ -1322,7 +1357,7 @@ function sage_roi_order_date_get_sage_submit_order_date( $order ) {
     }
     $out['delivery_ymd'] = sage_roi_order_date_resolve_delivery_ymd_for_order( $order );
 
-    $final_meta = $order->get_meta( sage_roi_option_key( 'sage_final_order_date' ) );
+    $final_meta = sage_roi_order_meta_get( $order, 'sage_final_order_date' );
     if ( is_string( $final_meta ) && preg_match( '/^\d{4}-\d{2}-\d{2}$/', trim( $final_meta ) ) ) {
         $final_hyphen          = trim( $final_meta );
         $out['final_ymd']      = $final_hyphen;
@@ -1917,7 +1952,7 @@ function sage_roi_order_date_checkout_save_meta( $order_id ) {
 // --- Display in admin order ---
 add_action( 'woocommerce_admin_order_data_after_billing_address', 'sage_roi_order_date_display_in_admin' );
 function sage_roi_order_date_display_in_admin( $order ) {
-    $date = $order->get_meta( sage_roi_option_key( 'order_date' ) );
+    $date = sage_roi_order_meta_get( $order, 'order_date' );
     if ( ! $date ) {
         $cf = sage_roi_order_date_blocks_checkout_fields();
         if ( $cf ) {

@@ -2,31 +2,39 @@
 
 
 function sage_roi_nonce_post_check() {
-  if(!wp_verify_nonce( $_POST['nonce'], 'sage_roi_nonce' )) {
-    throw new Exception("Sage ROI noce is invalid");
-    die();
+  $nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
+  if ( ! wp_verify_nonce( $nonce, 'sage_roi_nonce' ) ) {
+    wp_send_json_error( array( 'message' => 'Invalid nonce' ), 403 );
   }
 }
 
 
 function sage_roi_nonce_get_check() {
-  if(!wp_verify_nonce( $_GET['nonce'], 'sage_roi_nonce' )) {
-    throw new Exception("Sage ROI noce is invalid");
-    die();
+  $nonce = isset( $_GET['nonce'] ) ? sanitize_text_field( wp_unslash( $_GET['nonce'] ) ) : '';
+  if ( ! wp_verify_nonce( $nonce, 'sage_roi_nonce' ) ) {
+    wp_send_json_error( array( 'message' => 'Invalid nonce' ), 403 );
   }
 }
 
-add_action( 'wp_ajax_nopriv_sage_roi_customer_search', 'sage_roi_customer_search');
+/**
+ * Admin-only: backs the customer picker on the Order Dates screen. A nonce alone would not
+ * gate this — logged-out nonces are predictable per-session — so without the capability check
+ * the wp_ajax_nopriv registration exposed every customer's name, email, address and phone to
+ * anonymous search.
+ */
 add_action( 'wp_ajax_sage_roi_customer_search', 'sage_roi_customer_search' );
 function sage_roi_customer_search() {
 
   sage_roi_nonce_get_check();
-  if ( ! isset( $_GET['term'] ) || strlen( sanitize_text_field( $_GET['term'] ) ) < 3 ) {
+  if ( ! current_user_can( 'list_users' ) ) {
+    wp_send_json_error( array( 'message' => 'Forbidden' ), 403 );
+  }
+  if ( ! isset( $_GET['term'] ) || strlen( sanitize_text_field( wp_unslash( $_GET['term'] ) ) ) < 3 ) {
     echo json_encode( [] );
     exit;
   }
 
-  $search_term = sanitize_text_field( $_GET['term'] );
+  $search_term = sanitize_text_field( wp_unslash( $_GET['term'] ) );
 
   $args = array(
     'role'       => 'customer',

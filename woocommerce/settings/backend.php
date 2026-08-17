@@ -414,33 +414,53 @@ function sage_roi_admin_order_custom_metabox() {
 function sage_roi_custom_metabox_content( $object ) {
     // Get the WC_Order object
     $order = is_a( $object, 'WP_Post' ) ? wc_get_order( $object->ID ) : $object;
-    $orderId = $order->get_order_number();
-    $orderJson = get_post_meta( $orderId, sage_roi_option_key('order_json' ), true );
-    $orderJson = json_decode($orderJson);
-    if(!isset($orderJson)) {
+    if ( ! $order ) {
         return false;
     }
+    $orderJson = json_decode( get_post_meta( $order->get_order_number(), sage_roi_option_key( 'order_json' ), true ) );
+    if ( ! is_object( $orderJson ) ) {
+        return false;
+    }
+
+    // Every value below comes from the Sage API, so none of it goes out unescaped, and a
+    // missing branch of the payload prints blank rather than warning or fatalling.
+    $get = static function ( $source, $key ) {
+        return is_object( $source ) && isset( $source->$key ) ? (string) $source->$key : '';
+    };
+    $rows = static function ( array $fields ) {
+        foreach ( $fields as $label => $value ) {
+            echo '<p>' . esc_html( $label . ': ' . $value ) . '<p>';
+        }
+    };
+
+    $warehouse   = $orderJson->Warehouse ?? null;
+    $salesperson = $orderJson->Salesperson ?? null;
+
     echo '<h4>Order Details</h4>';
-    echo '<p>Sales Order #: '.$orderJson->SalesOrderNo.'<p>';
-    echo '<p>Order Date: '.sage_roi_api_date($orderJson->OrderDate).'<p>';
-    echo '<p>Order Status: '.$orderJson->OrderStatus.'<p>';
-    echo '<p>AR Division No.: '.$orderJson->ARDivisionNo.'<p>';
-    echo '<p>Tax Schedule: '.$orderJson->TaxSchedule.'<p>';
-    echo '<p>Terms Code: '.$orderJson->TermsCode.'<p>';
-    echo '<p>Discount Rate: $'.$orderJson->DiscountRate.'<p>';
-    echo '<p>Discount Amount: $'.$orderJson->DiscountAmt.'<p>';
-    echo '<p>Taxable Amount: $'.$orderJson->TaxableAmt.'<p>';
-    echo '<p>Non Taxable Amount: $'.$orderJson->NonTaxableAmt.'<p>';
-    echo '<p>Sales Tax Amount: $'.$orderJson->SalesTaxAmt.'<p>';
-    echo '<p>Freight Amount: $'.$orderJson->FreightAmt.'<p>';
-    echo '<p>Deposit Amount: $'.$orderJson->DepositAmt.'<p>';
-    echo '<p>Sage Contact Code: '.$orderJson->SageContactCode.'<p>';
+    $rows( array(
+        'Sales Order #'      => $get( $orderJson, 'SalesOrderNo' ),
+        'Order Date'         => (string) sage_roi_api_date( $get( $orderJson, 'OrderDate' ) ),
+        'Order Status'       => $get( $orderJson, 'OrderStatus' ),
+        'AR Division No.'    => $get( $orderJson, 'ARDivisionNo' ),
+        'Tax Schedule'       => $get( $orderJson, 'TaxSchedule' ),
+        'Terms Code'         => $get( $orderJson, 'TermsCode' ),
+        'Discount Rate'      => '$' . $get( $orderJson, 'DiscountRate' ),
+        'Discount Amount'    => '$' . $get( $orderJson, 'DiscountAmt' ),
+        'Taxable Amount'     => '$' . $get( $orderJson, 'TaxableAmt' ),
+        'Non Taxable Amount' => '$' . $get( $orderJson, 'NonTaxableAmt' ),
+        'Sales Tax Amount'   => '$' . $get( $orderJson, 'SalesTaxAmt' ),
+        'Freight Amount'     => '$' . $get( $orderJson, 'FreightAmt' ),
+        'Deposit Amount'     => '$' . $get( $orderJson, 'DepositAmt' ),
+        'Sage Contact Code'  => $get( $orderJson, 'SageContactCode' ),
+    ) );
 
     echo '<h4>Warehouse</h4>';
-    echo '<p>'.$orderJson->Warehouse->WarehouseDesc.' - ' . $orderJson->Warehouse->WarehouseName . '<p>';
+    echo '<p>' . esc_html( $get( $warehouse, 'WarehouseDesc' ) . ' - ' . $get( $warehouse, 'WarehouseName' ) ) . '<p>';
 
     echo '<h4>Sales Person</h4>';
-    echo '<p>Division #: '.$orderJson->Salesperson->SalespersonDivisionNo.'<p>';
-    echo '<p>Sales Person #: '.$orderJson->Salesperson->SalespersonNo.'<p>';
-    echo '<p>Name: '.$orderJson->Salesperson->SalespersonName.'<p>';
+    $rows( array(
+        'Division #'     => $get( $salesperson, 'SalespersonDivisionNo' ),
+        'Sales Person #' => $get( $salesperson, 'SalespersonNo' ),
+        'Name'           => $get( $salesperson, 'SalespersonName' ),
+    ) );
 }

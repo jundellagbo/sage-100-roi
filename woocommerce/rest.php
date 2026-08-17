@@ -101,6 +101,23 @@ function sage_roi_base_endpoint( $api ) {
     }
 }
 
+/**
+ * Escape a value being embedded in one of the Dynamic LINQ filter expressions the Sage search
+ * endpoints take. Without this, a quote in an email address or order number closes the literal
+ * and the rest becomes predicate code — enough to turn a single-customer lookup into
+ * "return everything".
+ *
+ * Escapes the LINQ layer only. The caller must still pass the finished expression through
+ * wp_json_encode(), because the request body is a JSON string and hand-writing its quotes
+ * would let a `\"` in the value decode straight back into a delimiter.
+ *
+ * @param string $value Raw value.
+ * @return string Safe to place between double quotes inside a LINQ expression.
+ */
+function sage_roi_linq_string( $value ) {
+    return str_replace( array( '\\', '"' ), array( '\\\\', '\\"' ), (string) $value );
+}
+
 function sage_roi_acknowledgement_external_provider_id() {
     $isProduction = sage_roi_get_option('use_production');
     if($isProduction) {

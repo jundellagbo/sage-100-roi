@@ -37,7 +37,7 @@
             </div>
         <?php else: ?>
             <div class="notice notice-error inline" style="margin:0;margin-bottom:20px;">
-                <p>API Token is invalid with the response of <?php echo $tokenStatusCode; ?>.</p>
+                <p>API Token is invalid with the response of <?php echo esc_html( $tokenStatusCode ); ?>.</p>
             </div>
         <?php endif;
     ?>
@@ -52,15 +52,15 @@
         <!-- The nonce field is a security feature to avoid submissions from outside WP admin -->
         <?php wp_nonce_field( 'sage_roi_api_options_verify'); ?>
         <h1>Microsoft Oauth Token URL</h1>
-        <input type="text" name="<?php echo sage_roi_option_key('oauth_token_url'); ?>" value="<?php echo $fds->decrypt( sage_roi_get_option('oauth_token_url') ); ?>" placeholder="Enter Microsoft Oauth Token URL" class="apisettinginput">
+        <input type="text" name="<?php echo sage_roi_option_key('oauth_token_url'); ?>" value="<?php echo esc_attr( $fds->decrypt( sage_roi_get_option('oauth_token_url') ) ); ?>" placeholder="Enter Microsoft Oauth Token URL" class="apisettinginput">
         <h2>Development Credentials</h2>
-        <input type="password" name="<?php echo sage_roi_option_key('client_id'); ?>" value="<?php echo $fds->decrypt( sage_roi_get_option('client_id') ); ?>" placeholder="Enter Client ID" class="apisettinginput">
-        <input type="password" name="<?php echo sage_roi_option_key('client_secret'); ?>" value="<?php echo $fds->decrypt( sage_roi_get_option('client_secret') ); ?>" placeholder="Enter Client Secret" class="apisettinginput">
-        <input type="password" name="<?php echo sage_roi_option_key('client_scope'); ?>" value="<?php echo $fds->decrypt( sage_roi_get_option('client_scope') ); ?>" placeholder="Enter Client Scope" class="apisettinginput">
+        <input type="password" name="<?php echo sage_roi_option_key('client_id'); ?>" value="<?php echo esc_attr( $fds->decrypt( sage_roi_get_option('client_id') ) ); ?>" placeholder="Enter Client ID" class="apisettinginput">
+        <input type="password" name="<?php echo sage_roi_option_key('client_secret'); ?>" value="<?php echo esc_attr( $fds->decrypt( sage_roi_get_option('client_secret') ) ); ?>" placeholder="Enter Client Secret" class="apisettinginput">
+        <input type="password" name="<?php echo sage_roi_option_key('client_scope'); ?>" value="<?php echo esc_attr( $fds->decrypt( sage_roi_get_option('client_scope') ) ); ?>" placeholder="Enter Client Scope" class="apisettinginput">
         <h2>Production Credentials</h2>
-        <input type="password" name="<?php echo sage_roi_option_key('client_id_production'); ?>" value="<?php echo $fds->decrypt( sage_roi_get_option('client_id_production') ); ?>" placeholder="Enter Client ID" class="apisettinginput">
-        <input type="password" name="<?php echo sage_roi_option_key('client_secret_production'); ?>" value="<?php echo $fds->decrypt( sage_roi_get_option('client_secret_production') ); ?>" placeholder="Enter Client Secret" class="apisettinginput">
-        <input type="password" name="<?php echo sage_roi_option_key('client_scope_production'); ?>" value="<?php echo $fds->decrypt( sage_roi_get_option('client_scope_production') ); ?>" placeholder="Enter Client Scope" class="apisettinginput">
+        <input type="password" name="<?php echo sage_roi_option_key('client_id_production'); ?>" value="<?php echo esc_attr( $fds->decrypt( sage_roi_get_option('client_id_production') ) ); ?>" placeholder="Enter Client ID" class="apisettinginput">
+        <input type="password" name="<?php echo sage_roi_option_key('client_secret_production'); ?>" value="<?php echo esc_attr( $fds->decrypt( sage_roi_get_option('client_secret_production') ) ); ?>" placeholder="Enter Client Secret" class="apisettinginput">
+        <input type="password" name="<?php echo sage_roi_option_key('client_scope_production'); ?>" value="<?php echo esc_attr( $fds->decrypt( sage_roi_get_option('client_scope_production') ) ); ?>" placeholder="Enter Client Scope" class="apisettinginput">
         <input type="checkbox" name="<?php echo sage_roi_option_key('use_production'); ?>" value="1" <?php echo sage_roi_get_option('use_production') ? "checked" : ""; ?>> Use Production Credentials
         <div style="margin-top: 10px;">
             <input type="hidden" name="action" value="sage_roi_external_api">			 
@@ -141,6 +141,17 @@
         Stop Orders Sync
     </label>
 
+    <h3>Sage order JSON retention</h3>
+    <p>Orders older than this drop their stored Sage payload the next time the database cleanup below runs. 0 keeps it forever.</p>
+
+    <label for="<?php echo sage_roi_option_key('order_json_retention_days'); ?>">
+        Days to keep
+        <input type="number" min="0" step="1"
+        id="<?php echo sage_roi_option_key('order_json_retention_days'); ?>"
+        name="<?php echo sage_roi_option_key('order_json_retention_days'); ?>"
+        value="<?php echo esc_attr( sage_roi_order_json_retention_days() ); ?>">
+    </label>
+
     <h3>Resets</h3>
     <p>It will sync starts to first page</p>
 
@@ -169,8 +180,102 @@
         Reset Orders Sync (current page to sync: <?php echo sage_roi_get_option('orders_page_number'); ?>)
     </label>
 
-    <input type="submit" name="submit" id="submit" class="update-button button button-primary" style="margin-bottom: 5px;" value="Save and execute resets"  />  
-</form> 
+    <input type="submit" name="submit" id="submit" class="update-button button button-primary" style="margin-bottom: 5px;" value="Save and execute resets"  />
+</form>
+
+<div class="divider"></div>
+
+<?php
+$prune_state   = sage_roi_prune_get_state();
+$prune_running = sage_roi_prune_is_running();
+$prune_sizes   = sage_roi_prune_table_sizes();
+?>
+
+<h2>Database cleanup</h2>
+<p>
+    Orders store the Sage API response. Only a couple of dozen fields are ever read back, so this rewrites
+    the stored payloads down to those fields and removes duplicate rows left by older syncs. Nothing is lost
+    that a Reset Orders Sync cannot restore — but take a database backup first.
+</p>
+
+<table class="widefat striped" style="max-width: 620px; margin-bottom: 15px;">
+    <thead><tr><th>Table</th><th style="text-align:right;">Size on disk</th></tr></thead>
+    <tbody>
+    <?php foreach ( $prune_sizes as $prune_table => $prune_bytes ) : ?>
+        <tr>
+            <td><code><?php echo esc_html( $prune_table ); ?></code></td>
+            <td style="text-align:right;"><?php echo esc_html( size_format( $prune_bytes ) ); ?></td>
+        </tr>
+    <?php endforeach; ?>
+    </tbody>
+</table>
+
+<?php if ( $prune_state ) : ?>
+    <?php
+    $prune_total     = array_sum( (array) $prune_state['totals'] );
+    $prune_done      = min( array_sum( (array) $prune_state['processed'] ), $prune_total );
+    $prune_percent   = $prune_total > 0 ? (int) floor( $prune_done / $prune_total * 100 ) : 100;
+    $prune_saved     = $prune_state['stats']['bytes_before'] - $prune_state['stats']['bytes_after'];
+    $prune_phases    = array(
+        'dedupe'    => 'Removing duplicate rows',
+        'orders'    => 'Rewriting order payloads',
+        'items'     => 'Rewriting line payloads',
+        'retention' => 'Applying retention window',
+        'done'      => 'Finished',
+    );
+    ?>
+    <div class="notice notice-<?php echo $prune_running ? 'info' : 'success'; ?> inline" style="margin:0 0 15px;">
+        <p style="margin:8px 0;">
+            <strong>
+                <?php
+                if ( ! empty( $prune_state['cancelled'] ) ) {
+                    echo 'Stopped';
+                } elseif ( $prune_running ) {
+                    echo esc_html( $prune_phases[ $prune_state['phase'] ] ?? $prune_state['phase'] ) . ' — ' . (int) $prune_percent . '%';
+                } else {
+                    echo $prune_state['dry_run'] ? 'Preview complete' : 'Cleanup complete';
+                }
+                ?>
+            </strong>
+            <?php if ( $prune_state['dry_run'] ) : ?>
+                <em>(preview only — nothing was written)</em>
+            <?php endif; ?>
+        </p>
+        <p style="margin:8px 0;">
+            <?php
+            printf(
+                '%s duplicate row(s) · %s order payload(s) · %s line payload(s) · %s purged · <strong>%s</strong> reclaimed',
+                esc_html( number_format_i18n( $prune_state['stats']['duplicates_removed'] ) ),
+                esc_html( number_format_i18n( $prune_state['stats']['orders_slimmed'] ) ),
+                esc_html( number_format_i18n( $prune_state['stats']['items_slimmed'] ) ),
+                esc_html( number_format_i18n( $prune_state['stats']['purged_orders'] ) ),
+                esc_html( size_format( max( 0, $prune_saved ) ) )
+            );
+            ?>
+        </p>
+        <?php if ( ! $prune_running && ! $prune_state['dry_run'] && $prune_saved > 0 ) : ?>
+            <p style="margin:8px 0;">
+                Freed space stays inside the table files until they are rebuilt. Ask your host to run
+                <code>OPTIMIZE TABLE</code> on the tables above to return it to the disk.
+            </p>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>
+
+<form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="POST">
+    <?php wp_nonce_field( 'sage_roi_prune_order_json' ); ?>
+    <input type="hidden" name="action" value="sage_roi_prune_order_json">
+    <?php if ( $prune_running ) : ?>
+        <p>The cleanup is running in the background. Reload this page to update the progress above.</p>
+        <button type="submit" name="sage_roi_prune_action" value="cancel" class="button">Stop cleanup</button>
+    <?php else : ?>
+        <button type="submit" name="sage_roi_prune_action" value="preview" class="button">Preview (no changes)</button>
+        <button type="submit" name="sage_roi_prune_action" value="run" class="button button-primary"
+            onclick="return confirm('Run the database cleanup now? Take a database backup first.');">Run cleanup</button>
+    <?php endif; ?>
+</form>
+
+<div class="divider"></div>
 
 <h3>Item codes sync</h3>
 <p>It will immediately pull items.</p>
@@ -195,7 +300,7 @@
 
 <div>
     <label>Access Token</label>
-    <input type="text" id="accessTokenValue" readonly value="<?php echo $fds->decrypt( sage_roi_get_option('access_token') ); ?>">
+    <input type="text" id="accessTokenValue" readonly value="<?php echo esc_attr( $fds->decrypt( sage_roi_get_option('access_token') ) ); ?>">
     <button onclick="copyAccessToken()" class="button button-primary">Copy access token</button>
 </div>
 

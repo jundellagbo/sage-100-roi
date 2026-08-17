@@ -57,6 +57,8 @@ require_once __DIR__ . '/woocommerce/images.php';
 
 require_once __DIR__ . '/woocommerce/items.php';
 
+require_once __DIR__ . '/woocommerce/order-json-storage.php';
+
 require_once __DIR__ . '/woocommerce/orders.php';
 
 require_once __DIR__ . '/woocommerce/cart.php';
@@ -84,6 +86,42 @@ function sage_roi_get_option( $option, $default="" ) {
     } else {
         return $default;
     }
+}
+
+/**
+ * Read one of this plugin's meta values off an order.
+ *
+ * WooCommerce's CRUD drops every meta key beginning with `wp_`
+ * (WC_Data_Store_WP::exclude_internal_meta_keys), and sage_roi_option_key() prefixes all of
+ * ours with `wp_xookerdev_sage_roi_`. So `$order->get_meta()` always returns '' for our keys,
+ * and `$order->update_meta_data()` never sees the existing row — which is how orders ended up
+ * with dozens of duplicate copies of the same payload. Go through the post-meta API instead.
+ *
+ * @param WC_Order|int $order Order or order ID.
+ * @param string       $key   Key without the plugin prefix.
+ * @return string
+ */
+function sage_roi_order_meta_get( $order, $key ) {
+    $id = is_object( $order ) ? $order->get_id() : (int) $order;
+    if ( ! $id ) {
+        return '';
+    }
+    $value = get_post_meta( $id, sage_roi_option_key( $key ), true );
+    return is_string( $value ) ? $value : $value;
+}
+
+/**
+ * @param WC_Order|int $order Order or order ID.
+ * @param string       $key   Key without the plugin prefix.
+ * @param mixed        $value Value to store.
+ * @return bool
+ */
+function sage_roi_order_meta_set( $order, $key, $value ) {
+    $id = is_object( $order ) ? $order->get_id() : (int) $order;
+    if ( ! $id ) {
+        return false;
+    }
+    return (bool) update_post_meta( $id, sage_roi_option_key( $key ), $value );
 }
 
 function sage_roi_meta_upsert( $type, $id, $key, $data, $usePluginKey=true ) {
@@ -173,6 +211,11 @@ function sage_roi_sync_settings() {
         sage_roi_set_option( $opt, isset( $_POST[ $key ] ) ? 1 : null );
     }
 
+    $retention_key = sage_roi_option_key( 'order_json_retention_days' );
+    if ( isset( $_POST[ $retention_key ] ) ) {
+        sage_roi_set_option( 'order_json_retention_days', max( 0, (int) $_POST[ $retention_key ] ) );
+    }
+
     $resets = array(
         'reset_item_sync'             => 'products_page_number',
         'reset_item_inprocess_sync'    => 'products_inprocess_page_number',
@@ -192,6 +235,51 @@ function sage_roi_sync_settings() {
         'message' => 'Settings has been saved, checked resets has been executed.',
     ) );
 }
+
+add_action( 'admin_post_sage_roi_prune_order_json', 'sage_roi_handle_prune_order_json' );
+
+/**
+ * Tools > Sage 100 ROI > Database cleanup. The work itself runs in Action Scheduler passes —
+ * a full rewrite takes minutes and would blow past any request timeout.
+ */
+function sage_roi_handle_prune_order_json() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( 'You do not have permission to do this.' );
+    }
+    check_admin_referer( 'sage_roi_prune_order_json' );
+
+    $action = isset( $_POST['sage_roi_prune_action'] ) ? sanitize_key( wp_unslash( $_POST['sage_roi_prune_action'] ) ) : '';
+
+    if ( 'cancel' === $action ) {
+        sage_roi_prune_cancel();
+        sage_roi_message_transient( array( 'status' => 'success', 'message' => 'Database cleanup stopped.' ) );
+        return;
+    }
+
+    if ( sage_roi_prune_is_running() ) {
+        sage_roi_message_transient( array( 'status' => 'error', 'message' => 'A cleanup is already running.' ) );
+        return;
+    }
+
+    if ( ! function_exists( 'as_schedule_single_action' ) ) {
+        sage_roi_message_transient( array(
+            'status'  => 'error',
+            'message' => 'Action Scheduler is unavailable, so the cleanup cannot run in the background. Use wp sage_roi prune_order_json instead.',
+        ) );
+        return;
+    }
+
+    $dry_run = ( 'preview' === $action );
+    sage_roi_prune_start( $dry_run );
+
+    sage_roi_message_transient( array(
+        'status'  => 'success',
+        'message' => $dry_run
+            ? 'Preview started. Reload this page for the estimate.'
+            : 'Database cleanup started. It runs in the background — reload this page for progress.',
+    ) );
+}
+
 
 add_action( 'admin_post_sage_roi_external_api', 'sage_roi_submit_api_key' );
 

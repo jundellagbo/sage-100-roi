@@ -243,9 +243,6 @@ function sage_roi_get_customer_in_sage( $email = null ) {
         if ( $cached_customer === '_not_found_' ) {
             return false;
         }
-        if ( is_string($cached_customer) && strpos($cached_customer, 'Error:') === 0 ) {
-            return $cached_customer;
-        }
         return $cached_customer;
     }
 
@@ -261,12 +258,24 @@ function sage_roi_get_customer_in_sage( $email = null ) {
             'Content-Type'  => 'application/json',
             'Authorization' => 'Bearer ' . $fds->decrypt(sage_roi_get_option('access_token'))
         ),
-        'body' => '"x => x.EmailAddress.Contains(\"' . $email . '\")"'
+        'body' => wp_json_encode( 'x => x.EmailAddress.Contains("' . sage_roi_linq_string( $email ) . '")' )
     ));
 
+    // A transport failure is not "no such customer", and caching it for a day meant one
+    // flaky minute took the customer's checkout down until midnight. Short cache only.
     if ( is_wp_error( $customerResponse ) ) {
-        set_transient( $cache_key, 'Error:' . $customerResponse->get_error_message(), DAY_IN_SECONDS );
-        return $customerResponse->get_error_message();
+        set_transient( $cache_key, $customerResponse, 5 * MINUTE_IN_SECONDS );
+        return $customerResponse;
+    }
+
+    $responseCode = (int) wp_remote_retrieve_response_code( $customerResponse );
+    if ( $responseCode < 200 || $responseCode >= 300 ) {
+        $error = new WP_Error(
+            'sage_roi_customer_lookup_failed',
+            sprintf( 'Sage customer lookup returned HTTP %d for %s', $responseCode, $email )
+        );
+        set_transient( $cache_key, $error, 5 * MINUTE_IN_SECONDS );
+        return $error;
     }
 
     $customerResponseResults = json_decode($customerResponse['body']);
@@ -320,10 +329,11 @@ add_action('wp_body_open', function() {
         return;
     }
 
-    // Check if user exists in Sage
+    // Check if user exists in Sage. A lookup error is not an answer, so stay quiet rather
+    // than telling a legitimate customer their account is missing.
     $customer = sage_roi_get_customer_in_sage( $user->user_email );
 
-    if ( ! $customer ) {
+    if ( ! $customer && ! is_wp_error( $customer ) ) {
         // Basic style for top notification bar
         ?>
         <div style="background:var( --e-global-color-primary );color:#fff;padding:12px 0;text-align:center;font-weight:bold;position:sticky;top:0;left:0;width:100%;z-index:99999;">
